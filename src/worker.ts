@@ -3,6 +3,7 @@
 import { default as handler } from '../.open-next/worker.js'; // Temporarily commented out for dev
 import { CloudflareEnv, ProcessingJob } from './types';
 import { VideoAPI } from './api/videos';
+import { handleCloudflareAccessLogin, handleCloudflareAccessCallback } from './cloudflare-access-handlers';
 import { AIProcessor } from './services/ai-processor';
 import { 
   handleGenerateChaptersManually,
@@ -96,6 +97,14 @@ const worker = {
             
           case path === '/api/auth/verify' && request.method === 'POST':
             response = await handleVerifyToken(request);
+            break;
+            
+          case path === '/api/auth/cloudflare-access' && request.method === 'GET':
+            response = await handleCloudflareAccessLogin(request, env);
+            break;
+            
+          case path === '/api/auth/cloudflare-access/callback' && request.method === 'GET':
+            response = await handleCloudflareAccessCallback(request, env);
             break;
 
           // Vector search endpoints

@@ -2,6 +2,9 @@
 
 export interface AuthToken {
   username: string;
+  email?: string;
+  provider?: string;
+  oidc_sub?: string;
   exp: number;
 }
 

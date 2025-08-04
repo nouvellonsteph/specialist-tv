@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { LoginForm } from './LoginForm';
+import { UserProfile } from './UserProfile';
 
 interface HeaderProps {
   videoCount?: number;
@@ -17,20 +18,8 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // Safely use auth context - handle case where it's not available
-  let isAuthenticated = false;
-  let logout = () => {};
-  let login = (token: string) => { console.log('Login fallback called with token:', token); };
-  
-  try {
-    const auth = useAuth();
-    isAuthenticated = auth.isAuthenticated;
-    logout = auth.logout;
-    login = auth.login;
-  } catch {
-    // useAuth is not available (not wrapped in AuthProvider)
-    // This is fine for pages that don't need authentication
-  }
+  // Use auth context directly - component must be wrapped in AuthProvider
+  const { isAuthenticated, user, logout, login } = useAuth();
 
   const isActive = (path: string) => {
     if (path === '/' && pathname === '/') return true;
@@ -90,24 +79,16 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
               </div>
             )}
             
-            {/* Authentication buttons - show on all pages */}
-            {isAuthenticated ? (
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Logout
-              </button>
+            {/* Authentication - show on all pages */}
+            {isAuthenticated && user ? (
+              <UserProfile user={user} onLogout={handleLogout} />
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m0 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m0 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3v1" />
                 </svg>
                 Login
               </button>
