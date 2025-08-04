@@ -28,6 +28,14 @@ function TVVideoContent() {
         const response = await fetch(`/api/videos/${slug}`);
         if (response.ok) {
           const video = await response.json() as Video;
+          
+          // In TV mode, only allow access to ready videos
+          if (video.status !== 'ready') {
+            console.log('Video not ready for TV mode, redirecting to TV library');
+            router.push('/tv');
+            return;
+          }
+          
           setSelectedVideo(video);
           
           // Handle timestamp from URL
@@ -157,7 +165,9 @@ function TVSidePanel({ video, onTimeSeek }: { video: Video; onTimeSeek: (time: n
         // Handle related videos - API returns VideoWithScore[] directly
         if (relatedResponse.ok) {
           const relatedData = await relatedResponse.json() as VideoWithScore[];
-          setRelatedVideos(relatedData || []);
+          // In TV mode, only show ready related videos
+          const readyRelatedVideos = (relatedData || []).filter(video => video.status === 'ready');
+          setRelatedVideos(readyRelatedVideos);
         }
       } catch (error) {
         console.error('Error loading video data:', error);

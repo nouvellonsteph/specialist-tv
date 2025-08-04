@@ -7,10 +7,12 @@ import VideoLibrary from '../../components/VideoLibrary';
 import { SearchBar } from '../../components/SearchBar';
 import { Header } from '../../components/Header';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { useAuth } from '../../contexts/AuthContext';
 
 import { Video, VideoWithScore } from '../../types';
 
 function CreatorContent() {
+  const { token } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
@@ -175,6 +177,7 @@ function CreatorContent() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(updates),
       });

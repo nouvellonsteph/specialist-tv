@@ -4,6 +4,7 @@ import { Video, VideoWithScore } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount, formatRelativeDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface VideoLibraryProps {
   videos: VideoWithScore[];
@@ -15,6 +16,7 @@ interface VideoLibraryProps {
 }
 
 const VideoLibrary: React.FC<VideoLibraryProps> = ({ videos, loading, onVideoSelect, isSearching, onVideoUpdate, showStatus = true }) => {
+  const { token } = useAuth();
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
@@ -72,6 +74,9 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ videos, loading, onVideoSel
     try {
       const response = await fetch(`/api/videos/${videoId}/generate-title`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       const result = await response.json() as { success: boolean; title?: string; message: string };

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Video } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Message {
   id: string;
@@ -16,6 +17,7 @@ interface VideoChatProps {
 }
 
 export function VideoChat({ video, transcript }: VideoChatProps) {
+  const { token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +64,7 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           videoId: video.id,

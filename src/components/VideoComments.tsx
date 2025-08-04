@@ -33,7 +33,7 @@ interface CommentItemProps {
 }
 
 export function VideoComments({ video }: VideoCommentsProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           content: newComment.trim(),
@@ -105,7 +105,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ content }),
       });
@@ -131,7 +131,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
       const response = await fetch(`/api/videos/${video.id}/comments/${commentId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 

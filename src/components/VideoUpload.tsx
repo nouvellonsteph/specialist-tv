@@ -2,12 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { Video } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface VideoUploadProps {
   onVideoUploaded: (video: Video) => void;
 }
 
 export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
+  const { token } = useAuth();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [title, setTitle] = useState('');
@@ -71,6 +73,9 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
 
       const response = await fetch('/api/videos/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
 

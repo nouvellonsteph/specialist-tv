@@ -21,9 +21,10 @@ interface VideoDetailsProps {
   onVideoDelete?: () => void;
   onVideoRefresh: () => void;
   onTimeSeek?: (time: number) => void;
+  tvMode?: boolean; // If true, only show ready videos in related section
 }
 
-export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, onTimeSeek }: VideoDetailsProps) {
+export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, onTimeSeek, tvMode = false }: VideoDetailsProps) {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [relatedVideos, setRelatedVideos] = useState<VideoWithScore[]>([]);
   const [transcript, setTranscript] = useState<string>('');
@@ -55,7 +56,11 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
 
       if (relatedRes.ok) {
         const relatedData = await relatedRes.json() as VideoWithScore[];
-        setRelatedVideos(relatedData);
+        // In TV mode, only show ready related videos
+        const filteredRelated = tvMode 
+          ? relatedData.filter(video => video.status === 'ready')
+          : relatedData;
+        setRelatedVideos(filteredRelated);
       }
 
       if (tagsRes.ok) {
@@ -68,7 +73,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
     } finally {
       setLoading(false);
     }
-  }, [video.id]);
+  }, [video.id, tvMode]);
 
   useEffect(() => {
     loadVideoData();

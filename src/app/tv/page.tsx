@@ -92,10 +92,13 @@ function TVContent() {
           const videoDetails = await Promise.all(videoDetailsPromises);
           const validVideos = videoDetails.filter((video): video is VideoWithScore => video !== null);
           
-          // Sort by confidence score (highest first)
-          validVideos.sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0));
+          // In TV mode, only show ready videos
+          const readyVideos = validVideos.filter(video => video.status === 'ready');
           
-          setSearchResults(validVideos);
+          // Sort by confidence score (highest first)
+          readyVideos.sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0));
+          
+          setSearchResults(readyVideos);
         } else {
           setSearchResults([]);
         }
@@ -184,7 +187,9 @@ function TVContent() {
   }, [performSearch, searchTimeout, updateUrl]);
 
   // Videos to display (search results or all videos)
-  const displayVideos = searchResults.length > 0 ? searchResults : videos;
+  // In TV mode, only show ready videos
+  const readyVideos = videos.filter(video => video.status === 'ready');
+  const displayVideos = searchResults.length > 0 ? searchResults : readyVideos;
 
   useEffect(() => {
     loadVideos();
