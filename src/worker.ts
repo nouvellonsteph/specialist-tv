@@ -1,4 +1,5 @@
 // Custom Worker for Knowledge Management POC with OpenNext integration
+//@ts-expect-error; build doesn't exist yet
 import { default as handler } from '../.open-next/worker.js'; // Temporarily commented out for dev
 import { CloudflareEnv, ProcessingJob } from './types';
 import { VideoAPI } from './api/videos';
