@@ -26,6 +26,7 @@ export interface VideoLogEntry {
   details?: Record<string, unknown>;
   duration_ms?: number | null;
   created_at: string;
+  created_by?: string;
 }
 
 export class VideoLogger {
@@ -40,14 +41,15 @@ export class VideoLogger {
     eventType: EventType,
     message: string,
     details?: Record<string, unknown>,
-    durationMs?: number
+    durationMs?: number,
+    createdBy?: string
   ): Promise<void> {
     try {
       const logId = crypto.randomUUID();
       
       await this.env.DB.prepare(`
-        INSERT INTO video_logs (id, video_id, level, event_type, message, details, duration_ms)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO video_logs (id, video_id, level, event_type, message, details, duration_ms, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         logId,
         videoId,
@@ -55,7 +57,8 @@ export class VideoLogger {
         eventType,
         message,
         details ? JSON.stringify(details) : null,
-        durationMs || null
+        durationMs || null,
+        createdBy || null
       ).run();
 
       // Also log to console for immediate debugging
@@ -117,7 +120,7 @@ export class VideoLogger {
    */
   async getVideoLogs(videoId: string, limit: number = 50): Promise<VideoLogEntry[]> {
     const result = await this.env.DB.prepare(`
-      SELECT id, video_id, level, event_type, message, details, duration_ms, created_at
+      SELECT id, video_id, level, event_type, message, details, duration_ms, created_at, created_by
       FROM video_logs
       WHERE video_id = ?
       ORDER BY created_at DESC
@@ -133,6 +136,7 @@ export class VideoLogger {
       details: row.details ? JSON.parse(row.details as string) : undefined,
       duration_ms: (row.duration_ms as number | null) || undefined,
       created_at: row.created_at as string,
+      created_by: row.created_by ? row.created_by as string : undefined,
     }));
   }
 

@@ -18,6 +18,12 @@ import { handleVectorSearch, handleVectorStats } from './vector-handlers';
 import { handleVideoProcessing } from './queue/video-processor';
 import { verifyWebhookSignature } from './utils/webhook';
 import { requireAuth } from './utils/auth';
+import { 
+  handleGetVideoComments, 
+  handleCreateComment, 
+  handleUpdateComment, 
+  handleDeleteComment 
+} from './handlers/comment-handlers';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -226,6 +232,32 @@ const worker = {
           case path === '/api/videos/sync' && request.method === 'POST':
             requireAuthForEndpoint(request);
             response = await handleSyncVideoStatus(videoAPI);
+            break;
+
+          // Comments endpoints
+          case path.match(/^\/api\/videos\/([^\/]+)\/comments$/) && request.method === 'GET':
+            const getCommentsVideoId = path.split('/')[3];
+            response = await handleGetVideoComments(getCommentsVideoId, env);
+            break;
+
+          case path.match(/^\/api\/videos\/([^\/]+)\/comments$/) && request.method === 'POST':
+            requireAuthForEndpoint(request);
+            const postCommentsVideoId = path.split('/')[3];
+            response = await handleCreateComment(request, postCommentsVideoId, env);
+            break;
+
+          case path.match(/^\/api\/videos\/([^\/]+)\/comments\/([^\/]+)$/) && request.method === 'PUT':
+            requireAuthForEndpoint(request);
+            const updateCommentVideoId = path.split('/')[3];
+            const updateCommentId = path.split('/')[5];
+            response = await handleUpdateComment(request, updateCommentVideoId, updateCommentId, env);
+            break;
+
+          case path.match(/^\/api\/videos\/([^\/]+)\/comments\/([^\/]+)$/) && request.method === 'DELETE':
+            requireAuthForEndpoint(request);
+            const deleteCommentVideoId = path.split('/')[3];
+            const deleteCommentId = path.split('/')[5];
+            response = await handleDeleteComment(request, deleteCommentVideoId, deleteCommentId, env);
             break;
 
           default:

@@ -67,7 +67,7 @@ export class VideoAPI {
   }
 
   // Upload video to Cloudflare Stream
-  async uploadVideo(file: File, title: string, description?: string): Promise<UploadResponse> {
+  async uploadVideo(file: File, title: string, description?: string, createdBy?: string): Promise<UploadResponse> {
     const videoId = this.generateId();
     
     // Debug: Check if Stream API credentials are configured
@@ -134,9 +134,9 @@ export class VideoAPI {
     // Store video metadata in D1 with Cloudflare Stream thumbnail URL
     const thumbnailUrl = `https://videodelivery.net/${streamId}/thumbnails/thumbnail.jpg?time=0s&height=600`;
     await this.env.DB.prepare(`
-      INSERT INTO videos (id, title, description, stream_id, status, thumbnail_url)
-      VALUES (?, ?, ?, ?, 'processing', ?)
-    `).bind(videoId, title, description || '', streamId, thumbnailUrl).run();
+      INSERT INTO videos (id, title, description, stream_id, status, thumbnail_url, created_by)
+      VALUES (?, ?, ?, ?, 'processing', ?, ?)
+    `).bind(videoId, title, description || '', streamId, thumbnailUrl, createdBy || null).run();
 
     return {
       video_id: videoId,
@@ -155,7 +155,7 @@ export class VideoAPI {
   }
 
   // Update video details
-  async updateVideo(videoId: string, updates: { title?: string; description?: string }): Promise<{ success: boolean; message: string; video?: Video }> {
+  async updateVideo(videoId: string, updates: { title?: string; description?: string }, updatedBy?: string): Promise<{ success: boolean; message: string; video?: Video }> {
     try {
       // Check if video exists
       const existingVideo = await this.getVideo(videoId);
@@ -181,8 +181,12 @@ export class VideoAPI {
         return { success: false, message: 'No fields to update' };
       }
 
-      // Add updated_at timestamp and video ID
+      // Add updated_at timestamp, updated_by, and video ID
       updateFields.push('updated_at = CURRENT_TIMESTAMP');
+      if (updatedBy) {
+        updateFields.push('updated_by = ?');
+        params.push(updatedBy);
+      }
       params.push(videoId);
 
       const query = `UPDATE videos SET ${updateFields.join(', ')} WHERE id = ?`;
@@ -194,7 +198,7 @@ export class VideoAPI {
       
       await this.logger.log(videoId, 'info', 'update', 'Video details updated', { 
         updatedFields: Object.keys(updates) 
-      });
+      }, undefined, updatedBy);
 
       return {
         success: true,
@@ -866,7 +870,7 @@ export class VideoAPI {
     duration?: number;
     thumbnail_url?: string;
     file_size?: number;
-  }): Promise<void> {
+  }, updatedBy?: string): Promise<void> {
     let query = `UPDATE videos SET status = ?, updated_at = CURRENT_TIMESTAMP`;
     const params: (string | number)[] = [status];
 
@@ -883,6 +887,11 @@ export class VideoAPI {
         query += `, file_size = ?`;
         params.push(metadata.file_size);
       }
+    }
+
+    if (updatedBy) {
+      query += `, updated_by = ?`;
+      params.push(updatedBy);
     }
 
     query += ` WHERE id = ?`;

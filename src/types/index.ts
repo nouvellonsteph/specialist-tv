@@ -15,6 +15,8 @@ export interface Video {
   view_count?: number;
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 export interface Transcript {
@@ -24,6 +26,7 @@ export interface Transcript {
   language: string;
   confidence_score?: number;
   created_at: string;
+  created_by?: string;
 }
 
 export interface Tag {
@@ -31,6 +34,7 @@ export interface Tag {
   name: string;
   category?: string;
   created_at: string;
+  created_by?: string;
 }
 
 export interface VideoTag {
@@ -47,6 +51,18 @@ export interface Chapter {
   end_time: number;
   summary?: string;
   created_at: string;
+  created_by?: string;
+}
+
+export interface Comment {
+  id: string;
+  video_id: string;
+  parent_id?: string;
+  content: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  replies?: Comment[];
 }
 
 export interface SearchResult {

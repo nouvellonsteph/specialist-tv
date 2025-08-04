@@ -6,6 +6,7 @@ import { Header } from '../../../components/Header';
 import { Video, VideoWithScore } from '../../../types';
 import { VideoPlayerMain } from '../../../components/VideoPlayerMain';
 import { VideoChat } from '../../../components/VideoChat';
+import { VideoComments } from '../../../components/VideoComments';
 import { formatTime } from '../../../utils/time';
 
 function TVVideoContent() {
@@ -80,7 +81,7 @@ function TVVideoContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row lg:space-x-6 space-y-6 lg:space-y-0">
           {/* Video Player - Takes 3/5 width on desktop, full width on mobile */}
-          <div className="flex-1 lg:w-3/5">
+          <div className="flex-1 lg:w-3/5 space-y-6">
             <VideoPlayerMain 
               video={selectedVideo} 
               onBack={handleBackToLibrary}
@@ -88,6 +89,9 @@ function TVVideoContent() {
               showQuickActions={false}
               // No video refresh or tag click functionality in TV mode
             />
+            
+            {/* Comments Section */}
+            <VideoComments video={selectedVideo} />
           </div>
 
           {/* Side Panel - Takes 2/5 width on desktop, full width on mobile */}
