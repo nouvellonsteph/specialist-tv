@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-
 import { VideoPlayerMain } from '../../../components/VideoPlayerMain';
 import { VideoDetails } from '../../../components/VideoDetails';
 import { Header } from '../../../components/Header';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { useAuth } from '../../../contexts/AuthContext';
 
 import { Video } from '../../../types';
 
@@ -14,6 +14,7 @@ function CreatorVideoContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { token } = useAuth();
   const slug = params.slug as string;
   
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
@@ -79,11 +80,14 @@ function CreatorVideoContent() {
 
   // Handle video deletion
   const handleVideoDelete = useCallback(async () => {
-    if (!selectedVideo) return;
+    if (!selectedVideo || !token) return;
     
     try {
       const response = await fetch(`/api/videos/${selectedVideo.id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
       if (response.ok) {
@@ -97,7 +101,7 @@ function CreatorVideoContent() {
       console.error('Error deleting video:', error);
       alert('Error deleting video. Please try again.');
     }
-  }, [selectedVideo, router]);
+  }, [selectedVideo, router, token]);
 
   useEffect(() => {
     loadVideoBySlug();

@@ -160,6 +160,7 @@ const worker = {
 
           // Video chat
           case path === '/api/videos/chat' && request.method === 'POST':
+            requireAuthForEndpoint(request);
             response = await handleVideoChat(request, env);
             break;
 

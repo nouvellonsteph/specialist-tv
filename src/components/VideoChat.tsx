@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Video } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { LoginForm } from './LoginForm';
 
 interface Message {
   id: string;
@@ -17,10 +18,11 @@ interface VideoChatProps {
 }
 
 export function VideoChat({ video, transcript }: VideoChatProps) {
-  const { token } = useAuth();
+  const { token, isAuthenticated, login } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,7 +48,7 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || !isAuthenticated) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -107,7 +109,37 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Show login prompt for unauthenticated users
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col h-full max-h-96 items-center justify-center text-center p-6">
+        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Video Chat</h3>
+        <p className="text-gray-600 mb-4 max-w-sm">
+          Chat with AI about this video&apos;s content, ask questions, and get insights from the transcript.
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          Please log in to start chatting with the AI assistant.
+        </p>
+        <button
+          onClick={() => {
+            console.log('Login button clicked, setting showLoginModal to true');
+            setShowLoginModal(true);
+          }}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+        >
+          Login to Chat
+        </button>
+      </div>
+    );
+  }
+
   return (
+    <>
     <div className="flex flex-col h-full max-h-96">
       {/* Chat Header */}
       <div className="flex-shrink-0 pb-3 border-b border-gray-200 mb-3">
@@ -165,12 +197,12 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Ask about this video..."
-            disabled={isLoading}
+            disabled={isLoading || !isAuthenticated}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
           />
           <button
             type="submit"
-            disabled={!inputValue.trim() || isLoading}
+            disabled={!inputValue.trim() || isLoading || !isAuthenticated}
             className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {isLoading ? (
@@ -207,5 +239,35 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
         </div>
       )}
     </div>
+
+    {/* Login Modal */}
+    {console.log('showLoginModal state:', showLoginModal)}
+    {showLoginModal && (
+      <>
+        {/* Test Modal */}
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h3 className="text-lg font-bold mb-4">Test Modal</h3>
+            <p className="mb-4">If you see this, the modal is working!</p>
+            <button 
+              onClick={() => setShowLoginModal(false)}
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+        
+        {/* Original Login Form Modal */}
+        <LoginForm
+          onLogin={(token: string) => {
+            login(token);
+            setShowLoginModal(false);
+          }}
+          onClose={() => setShowLoginModal(false)}
+        />
+      </>
+    )}
+    </>
   );
 }
