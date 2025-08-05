@@ -160,8 +160,8 @@ export class YouTubeProcessor {
       let playerResponse: Record<string, unknown> | null = null;
       
       // Feature flag to enable browser rendering with Puppeteer
-      // Note: Browser rendering may have limitations in local development
-      const ENABLE_BROWSER_RENDERING = false; // Disabled for local dev - works better in production
+      // Updated to follow official Cloudflare Browser Rendering documentation
+      const ENABLE_BROWSER_RENDERING = true; // Enabled following official Cloudflare docs pattern
       
       // Method 1: Try browser rendering first (most reliable) - ENABLED
       if (ENABLE_BROWSER_RENDERING && this.env.BROWSER) {
@@ -215,6 +215,7 @@ export class YouTubeProcessor {
 
   /**
    * Extract player response using browser rendering with Puppeteer
+   * Following official Cloudflare Browser Rendering documentation
    */
   private async getPlayerResponseFromBrowser(videoId: string): Promise<{playerResponse: Record<string, unknown>, playerJs: string | null}> {
     if (!this.env.BROWSER) {
@@ -222,13 +223,13 @@ export class YouTubeProcessor {
     }
 
     try {
-      // Import Puppeteer dynamically
-      const puppeteer = await import('@cloudflare/puppeteer');
+      // Import Puppeteer following official Cloudflare docs
+      const puppeteer = (await import('@cloudflare/puppeteer')).default;
       
-      console.log('Launching browser with Puppeteer...');
+      console.log('Launching browser with Puppeteer following official Cloudflare pattern...');
       
-      // Launch browser using the BROWSER binding
-      const browser = await puppeteer.default.launch(this.env.BROWSER);
+      // Launch browser using the BROWSER binding - official Cloudflare pattern
+      const browser = await puppeteer.launch(this.env.BROWSER);
       const page = await browser.newPage();
       
       // Set viewport and user agent
@@ -643,6 +644,7 @@ export class YouTubeProcessor {
   
   /**
    * Download video using browser rendering to handle complex scenarios
+   * Following official Cloudflare Browser Rendering documentation
    */
   private async downloadWithBrowserRendering(url: string): Promise<{success: boolean, videoBuffer?: ArrayBuffer, error?: string}> {
     if (!this.env.BROWSER) {
@@ -650,13 +652,13 @@ export class YouTubeProcessor {
     }
 
     try {
-      // Import Puppeteer dynamically
-      const puppeteer = await import('@cloudflare/puppeteer');
+      // Import Puppeteer following official Cloudflare docs
+      const puppeteer = (await import('@cloudflare/puppeteer')).default;
       
-      console.log('Launching browser for download...');
+      console.log('Launching browser for download following official Cloudflare pattern...');
       
-      // Launch browser using the BROWSER binding
-      const browser = await puppeteer.default.launch(this.env.BROWSER);
+      // Launch browser using the BROWSER binding - official Cloudflare pattern
+      const browser = await puppeteer.launch(this.env.BROWSER);
       const page = await browser.newPage();
       
       // Set viewport and user agent
