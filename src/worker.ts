@@ -5,6 +5,7 @@ import { CloudflareEnv, ProcessingJob } from './types';
 import { VideoAPI } from './api/videos';
 import { handleCloudflareAccessLogin, handleCloudflareAccessCallback } from './cloudflare-access-handlers';
 import { AIProcessor } from './services/ai-processor';
+import { YouTubeProcessor } from './services/youtube-processor';
 import { 
   handleGenerateChaptersManually,
   handleGenerateTagsManually,
@@ -111,6 +112,17 @@ const worker = {
             
           case path === '/api/auth/cloudflare-access/callback' && request.method === 'GET':
             response = await handleCloudflareAccessCallback(request, env);
+            break;
+
+          // YouTube processing endpoints
+          case path === '/api/youtube/info' && request.method === 'POST':
+            requireAuthForEndpoint(request);
+            response = await handleYouTubeInfo(request, env);
+            break;
+            
+          case path === '/api/youtube/download' && request.method === 'POST':
+            requireAuthForEndpoint(request);
+            response = await handleYouTubeDownload(request, env, videoAPI);
             break;
 
           // Vector search endpoints
@@ -298,7 +310,134 @@ const worker = {
   async queue(batch: MessageBatch<ProcessingJob>, env: CloudflareEnv): Promise<void> {
     await handleVideoProcessing(batch, env);
   }
-};
+}
+
+// YouTube processing handlers
+async function handleYouTubeInfo(request: Request, env: CloudflareEnv): Promise<Response> {
+  try {
+    const { url } = await request.json() as { url: string };
+    
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'URL is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const youtubeProcessor = new YouTubeProcessor(env);
+    
+    if (!youtubeProcessor.isValidYouTubeUrl(url)) {
+      return new Response(JSON.stringify({ error: 'Invalid YouTube URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Extract video ID from URL
+    const videoId = youtubeProcessor.extractVideoId(url);
+    if (!videoId) {
+      return new Response(JSON.stringify({ error: 'Could not extract video ID from URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const videoInfo = await youtubeProcessor.getVideoInfo(videoId);
+    
+    return new Response(JSON.stringify({
+      success: true,
+      videoInfo
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleYouTubeDownload(request: Request, env: CloudflareEnv, videoAPI: VideoAPI): Promise<Response> {
+  try {
+    const { url, format, title, description } = await request.json() as {
+      url: string;
+      format: { itag: number; quality: string; format: string; ext: string };
+      title?: string;
+      description?: string;
+    };
+    
+    if (!url || !format) {
+      return new Response(JSON.stringify({ error: 'URL and format are required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const youtubeProcessor = new YouTubeProcessor(env);
+    
+    if (!youtubeProcessor.isValidYouTubeUrl(url)) {
+      return new Response(JSON.stringify({ error: 'Invalid YouTube URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Extract video ID from URL
+    const videoId = youtubeProcessor.extractVideoId(url);
+    if (!videoId) {
+      return new Response(JSON.stringify({ error: 'Could not extract video ID from URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Get video info first
+    const videoInfo = await youtubeProcessor.getVideoInfo(videoId);
+    
+    // Download the video
+    const downloadResult = await youtubeProcessor.downloadVideo(url, format);
+    
+    if (!downloadResult.success || !downloadResult.videoBuffer) {
+      return new Response(JSON.stringify({ error: downloadResult.error || 'Download failed' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Create a File object from the buffer
+    const videoFile = new File(
+      [downloadResult.videoBuffer], 
+      downloadResult.filename || `youtube_${videoInfo.videoId}.${format.ext}`,
+      { type: `video/${format.ext}` }
+    );
+
+    // Upload to Cloudflare Stream using existing VideoAPI
+    const uploadResult = await videoAPI.uploadVideo(
+      videoFile,
+      title || videoInfo.title,
+      description || videoInfo.description,
+      'youtube-downloader'
+    );
+
+    return new Response(JSON.stringify({
+      success: true,
+      video: uploadResult,
+      originalVideoInfo: videoInfo
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
 
 export default worker;
 

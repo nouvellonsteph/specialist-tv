@@ -120,11 +120,12 @@ export interface CloudflareEnv {
   WEBHOOK_SECRET?: string;
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
-  // OIDC Configuration
   OIDC_CLIENT_ID?: string;
   OIDC_CLIENT_SECRET?: string;
   OIDC_ISSUER?: string;
   OIDC_REDIRECT_URI?: string;
+  YOUTUBE_API_KEY?: string;
+  BROWSER?: Fetcher;
 }
 
 // Cloudflare Stream API response types

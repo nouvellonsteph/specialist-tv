@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { VideoUpload } from '../../components/VideoUpload';
+import { YouTubeDownloader } from '../../components/YouTubeDownloader';
 import VideoLibrary from '../../components/VideoLibrary';
 import { SearchBar } from '../../components/SearchBar';
 import { Header } from '../../components/Header';
@@ -20,6 +21,7 @@ function CreatorContent() {
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(true);
   const [initialUrlProcessed, setInitialUrlProcessed] = useState(false);
+  const [activeUploadTab, setActiveUploadTab] = useState<'file' | 'youtube'>('file');
 
   // Update URL for search queries only
   const updateUrl = useCallback((params: { q?: string }) => {
@@ -267,8 +269,54 @@ function CreatorContent() {
               showStatus={true}
             />
             
-          {/* Upload Area */}
-          <VideoUpload onVideoUploaded={handleVideoUploaded} />
+          {/* Upload Area with Tabs */}
+          <div className="bg-white rounded-lg border border-gray-200">
+            {/* Tab Navigation */}
+            <div className="border-b border-gray-200">
+              <nav className="flex space-x-8 px-6" aria-label="Upload tabs">
+                <button
+                  onClick={() => setActiveUploadTab('file')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeUploadTab === 'file'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    File Upload
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveUploadTab('youtube')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeUploadTab === 'youtube'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    YouTube Download
+                  </div>
+                </button>
+              </nav>
+            </div>
+            
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeUploadTab === 'file' && (
+                <VideoUpload onVideoUploaded={handleVideoUploaded} />
+              )}
+              {activeUploadTab === 'youtube' && (
+                <YouTubeDownloader onVideoUploaded={handleVideoUploaded} />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
