@@ -977,10 +977,17 @@ export class VideoAPI {
           duration,
           thumbnail_url: thumbnailUrl,
         });
+      }
 
-        // If video is ready and we haven't started processing yet, start the pipeline
-        if (newStatus === 'ready' && video.status === 'processing') {
-          console.log(`Video ${videoId} is ready, starting processing pipeline`);
+      // Check if video is ready but hasn't started processing yet
+      if (streamStatus === 'ready') {
+        // Check if we have a transcript (indicates processing has started)
+        const transcript = await this.env.DB.prepare(`
+          SELECT id FROM transcripts WHERE video_id = ?
+        `).bind(videoId).first();
+        
+        if (!transcript) {
+          console.log(`Video ${videoId} is ready but not processed yet, starting processing pipeline`);
           
           // Start processing pipeline
           await this.env.VIDEO_PROCESSING_QUEUE.send({
@@ -996,6 +1003,7 @@ export class VideoAPI {
     }
   }
 
+// ...
   // Sync all processing videos from Stream API
   async syncAllProcessingVideos(): Promise<void> {
     try {

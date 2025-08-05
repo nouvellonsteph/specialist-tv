@@ -159,6 +159,26 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
 
         onVideoUploaded(newVideo);
         
+        // Trigger sync to check if video is ready and start processing
+        try {
+          setUploadProgress('Checking video status...');
+          const syncResponse = await fetch('/api/videos/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          
+          if (syncResponse.ok) {
+            console.log('Video sync triggered successfully');
+          } else {
+            console.warn('Video sync failed, but upload was successful');
+          }
+        } catch (syncError) {
+          console.warn('Could not trigger video sync:', syncError);
+        }
+        
         // Reset form
         setSelectedFile(null);
         setTitle('');
