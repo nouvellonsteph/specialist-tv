@@ -7,6 +7,7 @@ import { VideoChat } from './VideoChat';
 import { Video, Tag, VideoWithScore } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount } from '../utils/dateUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Chapter {
   title: string;
@@ -25,6 +26,7 @@ interface VideoDetailsProps {
 }
 
 export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, onTimeSeek, tvMode = false }: VideoDetailsProps) {
+  const { token } = useAuth();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [relatedVideos, setRelatedVideos] = useState<VideoWithScore[]>([]);
   const [transcript, setTranscript] = useState<string>('');
@@ -32,6 +34,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
   const [activeTab, setActiveTab] = useState<'chapters' | 'details' | 'transcript' | 'vtt' | 'related' | 'logs' | 'chat' | 'tags'>('chapters');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const loadVideoData = useCallback(async () => {
     setLoading(true);
@@ -113,6 +116,38 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
     }
   };
 
+  const handleSyncVideo = async () => {
+    if (!token) return;
+    
+    try {
+      setSyncing(true);
+      const response = await fetch('/api/videos/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        console.log('Video sync completed successfully');
+        // Refresh video data and parent component
+        await loadVideoData();
+        if (onVideoRefresh) {
+          onVideoRefresh();
+        }
+      } else {
+        console.error('Video sync failed:', response.statusText);
+        alert('Failed to sync video. Please try again.');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      alert('Failed to sync video. Please try again.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Helper functions for similarity score badges (same as vector page)
   const getScoreColor = (score: number) => {
     if (score >= 0.8) return 'text-green-600 bg-green-50 border-green-200';
@@ -153,10 +188,24 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
           <p className="text-sm text-gray-600 mb-2">{video.description}</p>
         )}
         
-        <div className="flex items-center text-xs text-gray-900 space-x-4">
-          <span>Uploaded {formatDate(video.upload_date)}</span>
-          {video.duration && <span>{formatTime(video.duration)}</span>}
-          <span className="capitalize">{video.status}</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center text-xs text-gray-900 space-x-4">
+            <span>Uploaded {formatDate(video.upload_date)}</span>
+            {video.duration && <span>{formatTime(video.duration)}</span>}
+            <span className="capitalize">{video.status}</span>
+          </div>
+          
+          {/* Sync button - show for processing videos or when authenticated */}
+          {token && (video.status === 'processing' || video.status === 'ready') && (
+            <button
+              onClick={handleSyncVideo}
+              disabled={syncing}
+              className="ml-2 px-2 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Force sync video status and trigger processing if needed"
+            >
+              {syncing ? 'Syncing...' : 'Sync'}
+            </button>
+          )}
         </div>
       </div>
 

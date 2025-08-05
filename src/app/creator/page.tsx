@@ -149,10 +149,48 @@ function CreatorContent() {
     }
   }, []);
 
+  // Periodic sync for processing videos
+  const performPeriodicSync = useCallback(async () => {
+    if (!token) return;
+    
+    try {
+      // Check if there are any processing videos
+      const processingVideos = videos.filter(video => video.status === 'processing');
+      if (processingVideos.length === 0) return;
+      
+      console.log(`Performing periodic sync for ${processingVideos.length} processing videos`);
+      
+      const response = await fetch('/api/videos/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        console.log('Periodic sync completed successfully');
+        // Reload videos to get updated status
+        await loadVideos();
+      }
+    } catch (error) {
+      console.error('Periodic sync error:', error);
+    }
+  }, [token, videos, loadVideos]);
+
   // Load videos on mount
   useEffect(() => {
     loadVideos();
   }, [loadVideos]);
+
+  // Set up periodic sync every 2 minutes for processing videos
+  useEffect(() => {
+    if (!token) return;
+    
+    const interval = setInterval(performPeriodicSync, 2 * 60 * 1000); // 2 minutes
+    
+    return () => clearInterval(interval);
+  }, [performPeriodicSync, token]);
 
   // Handle URL params when data is available and not yet processed
   useEffect(() => {
