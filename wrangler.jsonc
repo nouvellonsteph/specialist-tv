@@ -58,6 +58,15 @@
 			"index_name": "video-embeddings"
 		}
 	],
+	// Migration to delete YouTubeDownloaderContainer Durable Object class
+	"migrations": [
+		{
+			"tag": "v2",
+			"deleted_classes": [
+				"YouTubeDownloaderContainer"
+			]
+		}
+	],
 	"vars": {
 		"WEBHOOK_SECRET": "thisisasecret"
 	},
