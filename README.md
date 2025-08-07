@@ -1,6 +1,13 @@
-# Knowledge Management POC - Specialist TV
+# Specialist TV
 
-A comprehensive video knowledge management platform built for pre-sales teams using the Cloudflare stack. This POC enables easy video upload, AI-powered processing, intelligent search, and content discovery.
+> A comprehensive video knowledge management platform built on the Cloudflare stack
+
+Specialist TV is an open-source video knowledge management platform that enables teams to easily upload, process, and discover video content using AI-powered features. Built entirely on Cloudflare's edge computing platform for maximum performance and scalability.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 
 ## 🚀 Features
 

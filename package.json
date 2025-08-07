@@ -1,7 +1,18 @@
 {
 	"name": "specialist-tv",
-	"version": "0.1.0",
-	"private": true,
+	"version": "1.0.0",
+	"description": "A comprehensive video knowledge management platform built for teams using the Cloudflare stack. Features AI-powered processing, intelligent search, and content discovery.",
+	"keywords": ["video", "knowledge-management", "cloudflare", "ai", "transcription", "search", "nextjs"],
+	"author": "Specialist TV Team",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/nouvellonsteph/specialist-tv.git"
+	},
+	"bugs": {
+		"url": "https://github.com/nouvellonsteph/specialist-tv/issues"
+	},
+	"homepage": "https://github.com/nouvellonsteph/specialist-tv#readme",
 	"scripts": {
 		"dev": "next dev --turbopack",
 		"build": "next build",

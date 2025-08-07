@@ -126,6 +126,7 @@ export interface CloudflareEnv {
   OIDC_REDIRECT_URI?: string;
   YOUTUBE_API_KEY?: string;
   BROWSER?: Fetcher;
+  ENVIRONMENT?: string;
 }
 
 // Cloudflare Stream API response types

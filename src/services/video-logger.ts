@@ -61,12 +61,14 @@ export class VideoLogger {
         createdBy || null
       ).run();
 
-      // Also log to console for immediate debugging
-      const logMessage = `[${level.toUpperCase()}] Video ${videoId} - ${eventType}: ${message}`;
-      if (details) {
-        console.log(logMessage, details);
-      } else {
-        console.log(logMessage);
+      // Also log to console in development mode
+      if (this.env.ENVIRONMENT === 'development') {
+        const logMessage = `[${level.toUpperCase()}] Video ${videoId} - ${eventType}: ${message}`;
+        if (details) {
+          console.log(logMessage, details);
+        } else {
+          console.log(logMessage);
+        }
       }
     } catch (error) {
       // Don't let logging errors break the main flow
