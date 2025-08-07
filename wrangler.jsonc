@@ -57,10 +57,7 @@
 			"binding": "VIDEO_EMBEDDINGS",
 			"index_name": "video-embeddings"
 		}
-	],
-	"vars": {
-		"WEBHOOK_SECRET": "thisisasecret"
-	},
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
