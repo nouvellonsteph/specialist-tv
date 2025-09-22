@@ -205,11 +205,20 @@ export async function handleCloudflareAccessCallback(request: Request, env: Clou
     redirectUrl.pathname = '/creator';
     redirectUrl.searchParams.set('token', token);
     
+    // Force HTTP for localhost development
+    if (redirectUrl.hostname === 'localhost' || redirectUrl.hostname === '127.0.0.1') {
+      redirectUrl.protocol = 'http:';
+    }
+    
+    // Only use Secure flag for HTTPS (not localhost development)
+    const isSecure = redirectUrl.protocol === 'https:';
+    const cookieFlags = `Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${isSecure ? '; Secure' : ''}`;
+    
     return new Response(null, {
       status: 302,
       headers: {
         'Location': redirectUrl.toString(),
-        'Set-Cookie': `auth-token=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=86400`,
+        'Set-Cookie': `auth-token=${token}; ${cookieFlags}`,
         ...corsHeaders
       }
     });
