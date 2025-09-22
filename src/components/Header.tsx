@@ -37,14 +37,14 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+            <Link href="/tv" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
                 <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2 6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                 </svg>
               </div>
-              <h1 className="text-xl font-semibold text-gray-900">Presales TV</h1>
-            </div>
+              <h1 className="text-xl font-semibold text-gray-900">Specialist TV</h1>
+            </Link>
             
             {/* Navigation Menu */}
             <nav className="flex items-center space-x-8">
