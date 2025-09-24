@@ -17,6 +17,7 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [uploadPercentage, setUploadPercentage] = useState<number>(0);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -53,12 +54,73 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
     }
   }, [title]);
 
+  // Chunked upload with progress tracking
+  const uploadFileWithProgress = (file: File, uploadUrl: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadPercentage(percentComplete);
+          setUploadProgress(`Uploading... ${percentComplete}%`);
+        }
+      });
+      
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          let errorMessage = `Upload failed (${xhr.status}): ${xhr.statusText}`;
+          try {
+            const errorData = xhr.responseText;
+            if (errorData) {
+              try {
+                const jsonError = JSON.parse(errorData);
+                if (jsonError.error) {
+                  errorMessage += ` - ${jsonError.error}`;
+                } else if (jsonError.message) {
+                  errorMessage += ` - ${jsonError.message}`;
+                }
+              } catch {
+                errorMessage += ` - ${errorData}`;
+              }
+            }
+          } catch (e) {
+            console.error('Could not read error response:', e);
+          }
+          reject(new Error(errorMessage));
+        }
+      });
+      
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+      
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('Upload timeout'));
+      });
+      
+      // Set a longer timeout for large files (30 minutes)
+      xhr.timeout = 30 * 60 * 1000;
+      
+      // Create FormData and upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      xhr.open('POST', uploadUrl);
+      xhr.send(formData);
+    });
+  };
+
   const handleUpload = async () => {
     if (!selectedFile || !title.trim() || status !== 'authenticated' || !session) return;
 
     // Clear previous errors and reset progress
     setError(null);
     setUploadProgress(null);
+    setUploadPercentage(0);
     setIsUploading(true);
     
     try {
@@ -84,9 +146,6 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
           upload_url: string;
         };
         
-        setUploadProgress('Uploading video to stream...');
-        
-        // Debug logging
         console.log('Stream upload details:', {
           uploadUrl: result.upload_url,
           fileName: selectedFile.name,
@@ -94,53 +153,11 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
           fileType: selectedFile.type
         });
         
-        // Step 2: Upload the actual video file to Cloudflare Stream
-        // Create FormData for proper multipart upload
-        const streamFormData = new FormData();
-        streamFormData.append('file', selectedFile);
-        
-        const uploadResponse = await fetch(result.upload_url, {
-          method: 'POST',
-          body: streamFormData,
-        });
-        
-        console.log('Stream upload response:', {
-          status: uploadResponse.status,
-          statusText: uploadResponse.statusText,
-          headers: Object.fromEntries(uploadResponse.headers.entries())
-        });
-        
-        if (!uploadResponse.ok) {
-          let errorMessage = `Stream upload failed (${uploadResponse.status}): ${uploadResponse.statusText}`;
-          
-          try {
-            // Try to get detailed error from response body
-            const errorData = await uploadResponse.text();
-            if (errorData) {
-              // Try to parse as JSON first
-              try {
-                const jsonError = JSON.parse(errorData);
-                if (jsonError.error) {
-                  errorMessage += ` - ${jsonError.error}`;
-                } else if (jsonError.message) {
-                  errorMessage += ` - ${jsonError.message}`;
-                } else {
-                  errorMessage += ` - ${errorData}`;
-                }
-              } catch {
-                // If not JSON, use raw text
-                errorMessage += ` - ${errorData}`;
-              }
-            }
-          } catch (e) {
-            // If we can't read the response body, just use the status
-            console.error('Could not read error response:', e);
-          }
-          
-          throw new Error(errorMessage);
-        }
+        // Upload with progress tracking
+        await uploadFileWithProgress(selectedFile, result.upload_url);
         
         setUploadProgress('Upload complete! Processing video...');
+        setUploadPercentage(100);
         
         // Create video object for immediate UI update
         const currentTime = new Date().toISOString();
@@ -183,6 +200,7 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
         setDescription('');
         setError(null);
         setUploadProgress(null);
+        setUploadPercentage(0);
         
         // Reset file input
         const fileInput = document.getElementById('video-file') as HTMLInputElement;
@@ -200,6 +218,7 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
       setIsUploading(false);
       if (!error) {
         setUploadProgress(null);
+        setUploadPercentage(0);
       }
     }
   };
@@ -256,7 +275,7 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
               <p className="text-sm text-gray-600">
                 <span className="font-medium text-orange-600">Click to upload</span> or drag and drop
               </p>
-              <p className="text-xs text-gray-500">MP4, MOV, AVI up to 500MB</p>
+              <p className="text-xs text-gray-500">MP4, MOV, AVI - Any size supported</p>
             </div>
             <input
               id="video-file"
@@ -333,8 +352,18 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 </div>
-                <div className="ml-3">
+                <div className="ml-3 flex-1">
                   <p className="text-sm text-blue-700">{uploadProgress}</p>
+                  {uploadPercentage > 0 && uploadPercentage < 100 && (
+                    <div className="mt-2">
+                      <div className="bg-blue-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${uploadPercentage}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
