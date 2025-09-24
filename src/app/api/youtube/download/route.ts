@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { env } = await getCloudflareContext();
     
     // Check authentication
-    const session = await requireAuth(request, env);
+    const session = await requireAuth(request);
     const user = getUserFromSession(session);
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

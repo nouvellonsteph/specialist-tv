@@ -19,10 +19,10 @@ export function getAuthConfig(env: CloudflareEnv): AuthConfig {
     trustHost: true,
     basePath: "/api/auth",
     useSecureCookies: !isDev, // Force non-secure cookies in development
-    // Use JWT strategy in development when DB is not available
-    ...(env.DB ? { adapter: D1Adapter(env.DB) } : {}),
+    adapter: D1Adapter(env.DB),
     providers: [
       Google({
+        allowDangerousEmailAccountLinking: true,
         clientId: env.GOOGLE_CLIENT_ID!,
         clientSecret: env.GOOGLE_CLIENT_SECRET!,
         authorization: {
@@ -55,78 +55,13 @@ export function getAuthConfig(env: CloudflareEnv): AuthConfig {
       }),
     ],
     callbacks: {
-      async jwt({ token, account, profile }) {
-        // Initial sign in
-        if (account && profile) {
-          token.accessToken = account.access_token;
-          token.refreshToken = account.refresh_token;
-          token.provider = account.provider;
-          token.oidc_sub = profile.sub;
-          token.expiresAt = account.expires_at;
-          
-          // Store additional Google profile data
-          if (account.provider === 'google') {
-            token.googleProfile = {
-              picture: profile.picture,
-              email_verified: profile.email_verified,
-              locale: profile.locale,
-            };
-          }
+      async session({ session, user }) {
+        // The user object is passed when using database sessions.
+        // We can add the user ID to the session for use in API routes.
+        if (user) {
+          session.user.id = user.id;
         }
-        
-        // Check if token needs refresh (for Google OAuth)
-        if (token.expiresAt && Date.now() < (token.expiresAt as number) * 1000) {
-          return token;
-        }
-        
-        // Token has expired, try to refresh it
-        if (token.refreshToken && token.provider === 'google') {
-          try {
-            const response = await fetch('https://oauth2.googleapis.com/token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({
-                client_id: env.GOOGLE_CLIENT_ID!,
-                client_secret: env.GOOGLE_CLIENT_SECRET!,
-                grant_type: 'refresh_token',
-                refresh_token: token.refreshToken as string,
-              }),
-            });
-            
-            if (response.ok) {
-              const refreshedTokens = await response.json() as {
-                access_token: string;
-                expires_in: number;
-                refresh_token?: string;
-              };
-              token.accessToken = refreshedTokens.access_token;
-              token.expiresAt = Math.floor(Date.now() / 1000) + refreshedTokens.expires_in;
-              if (refreshedTokens.refresh_token) {
-                token.refreshToken = refreshedTokens.refresh_token;
-              }
-            }
-          } catch (error) {
-            console.error('Error refreshing access token:', error);
-            // Return token as-is, will be handled by session callback
-          }
-        }
-        
-        return token;
-      },
-      async session({ session, token }) {
-        // Send properties to the client
-        return {
-          ...session,
-          accessToken: token.accessToken as string,
-          provider: token.provider as string,
-          oidc_sub: token.oidc_sub as string,
-          googleProfile: token.googleProfile as {
-            picture?: string;
-            email_verified?: boolean;
-            locale?: string;
-          } | undefined,
-          error: token.error as string | undefined,
-        };
+        return session;
       },
       async signIn({ user, account }) {
         console.log('🔵 Auth.js signIn callback:', { user: user?.email, provider: account?.provider });
@@ -138,7 +73,7 @@ export function getAuthConfig(env: CloudflareEnv): AuthConfig {
       }
     },
     session: {
-      strategy: env.DB ? "database" : "jwt",
+      strategy: "database",
       maxAge: 7 * 24 * 60 * 60, // 7 days
       updateAge: 24 * 60 * 60, // 24 hours
     },

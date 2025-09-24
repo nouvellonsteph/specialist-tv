@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getSession } from '@/lib/auth-helpers';
 
 const corsHeaders = {
@@ -15,8 +14,7 @@ export async function OPTIONS() {
 // POST /api/auth/verify - Verify Auth.js session
 export async function POST(request: NextRequest) {
   try {
-    const { env } = await getCloudflareContext();
-    const session = await getSession(request, env);
+    const session = await getSession(request);
     
     if (!session?.user) {
       return NextResponse.json(

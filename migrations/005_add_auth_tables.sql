@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   scope TEXT,
   id_token TEXT,
   session_state TEXT,
+  oauth_token TEXT,
+  oauth_token_secret TEXT,
   FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 );
 

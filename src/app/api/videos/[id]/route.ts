@@ -51,7 +51,7 @@ export async function PUT(
     const { env } = await getCloudflareContext();
     
     // Check authentication
-    const session = await requireAuth(request, env);
+    const session = await requireAuth(request);
     const user = getUserFromSession(session);
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -108,7 +108,7 @@ export async function DELETE(
     const { env } = await getCloudflareContext();
     
     // Check authentication
-    const session = await requireAuth(request, env);
+    const session = await requireAuth(request);
     const user = getUserFromSession(session);
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

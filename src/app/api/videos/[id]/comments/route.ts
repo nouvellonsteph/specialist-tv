@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { requireAuth, getUserFromSession } from '@/lib/auth-helpers';
+import { requireAuth } from '@/lib/auth-helpers';
 import { 
   handleGetVideoComments, 
   handleCreateComment 
@@ -23,6 +23,7 @@ export async function GET(
 ) {
   try {
     const { env } = await getCloudflareContext();
+    
     const { id } = await params;
     
     const response = await handleGetVideoComments(id, env);
@@ -50,15 +51,17 @@ export async function POST(
   try {
     const { env } = await getCloudflareContext();
     
-    // Check authentication
-    const session = await requireAuth(request, env);
-    const user = getUserFromSession(session);
-    if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    // Require authentication
+    const session = await requireAuth(request);
+    
+    console.log('Video chat session:', { 
+      userId: session.user?.id, 
+      email: session.user?.email,
+      provider: session.provider 
+    });
     const { id } = await params;
     
-    const response = await handleCreateComment(request, id, env);
+    const response = await handleCreateComment(request, id, env, session);
     
     // Add CORS headers
     Object.entries(corsHeaders).forEach(([key, value]) => {

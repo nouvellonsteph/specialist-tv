@@ -16,9 +16,9 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const { env } = await getCloudflareContext();
-    
+
     // Require authentication
-    const session = await requireAuth(request, env);
+    const session = await requireAuth(request);
     
     console.log('Video chat session:', { 
       userId: session.user?.id, 

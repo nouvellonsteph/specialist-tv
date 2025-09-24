@@ -1,6 +1,6 @@
 // API handlers for video management
 
-import { CloudflareEnv, Video, UploadResponse, SearchResult, StreamUploadResponse, Chapter, Tag, Transcript, VideoWithScore } from '../types';
+import { Video, UploadResponse, SearchResult, StreamUploadResponse, Chapter, Tag, Transcript, VideoWithScore } from '../types';
 import { VideoLogger, VideoLogEntry } from '../services/video-logger';
 import { EmbeddingService, SimilarVideo } from '../services/embedding-service';
 

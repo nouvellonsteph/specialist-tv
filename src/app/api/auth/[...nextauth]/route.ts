@@ -1,12 +1,12 @@
 import { Auth } from "@auth/core"
 import { getAuthConfig } from "../../../../lib/auth"
+import { getContext } from "../../../../lib/context";
 
 async function handler(request: Request) {
   console.log(`--- Auth Handler Request: ${request.method} ${request.url} ---`);
   
-  // Get environment from OpenNext context or fallback to process.env
-  const env = (globalThis as { getCloudflareContext?: () => { env: CloudflareEnv } }).getCloudflareContext?.()?.env || 
-    process.env as unknown as CloudflareEnv;
+  // Use the new centralized context helper
+  const { env } = getContext();
   
   // Force HTTP for localhost development by modifying the request
   const url = new URL(request.url);

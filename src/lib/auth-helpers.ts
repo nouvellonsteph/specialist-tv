@@ -1,5 +1,5 @@
-import { Auth } from "@auth/core"
-import { getAuthConfig } from "./auth"
+import { D1Adapter } from "@auth/d1-adapter";
+import { getContext } from "./context";
 
 export interface AuthSession {
   user?: {
@@ -25,115 +25,56 @@ export interface AuthSession {
 /**
  * Get the current session from a request with enhanced error handling
  */
-export async function getSession(request: Request, env: CloudflareEnv): Promise<AuthSession | null> {
-  try {
-    console.log('=== SESSION VALIDATION DEBUG START ===');
-    console.log('Request URL:', request.url);
-    console.log('Request method:', request.method);
-    
-    const cookies = request.headers.get('Cookie');
-    console.log('Request cookies:', cookies || 'NO COOKIES');
-    
-    // Parse cookies to check for session token
-    if (cookies) {
-      const sessionTokenMatch = cookies.match(/authjs\.session-token=([^;]+)/);
-      console.log('Session token found:', sessionTokenMatch ? 'YES' : 'NO');
-      if (sessionTokenMatch) {
-        console.log('Session token value:', sessionTokenMatch[1].substring(0, 20) + '...');
-      }
-    }
-    
-    const authConfig = getAuthConfig(env)
-    
-    // Create a session request to validate authentication
-    const url = new URL(request.url);
-    const sessionUrl = new URL('/api/auth/session', url.origin);
-    console.log('Session validation URL:', sessionUrl.toString());
-    
-    const sessionRequest = new Request(sessionUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'Cookie': request.headers.get('Cookie') || '',
-        'User-Agent': request.headers.get('User-Agent') || 'Specialist-TV-Auth',
-      },
-    });
-    
-    console.log('Calling Auth.js with session request...');
-    
-    // Use Auth.js to validate session
-    const response = await Auth(sessionRequest, authConfig)
-    
-    console.log('Auth.js session response:', {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-    
-    if (response.ok) {
-      const text = await response.text()
-      
-      console.log('Auth.js session text length:', text?.length || 0);
-      console.log('Auth.js session text preview:', text ? text.substring(0, 200) : 'empty');
-      
-      // Handle empty response
-      if (!text || text.trim() === '' || text === 'null') {
-        console.log('❌ Empty or null session response from Auth.js - session likely expired or invalid');
-        return null
-      }
-      
-      try {
-        const session = JSON.parse(text) as AuthSession
-        console.log('✅ Parsed session successfully:', {
-          hasUser: !!session.user,
-          userId: session.user?.id,
-          userEmail: session.user?.email,
-          provider: session.provider,
-          expires: session.expires
-        });
-        
-        // Check for authentication errors
-        if (session && session.error) {
-          console.warn('❌ Session contains error:', session.error)
-          return null
-        }
-        
-        // Validate session has required user data
-        if (session && session.user && session.user.id && session.user.email) {
-          console.log('✅ Session validation successful');
-          return session
-        } else {
-          console.log('❌ Session missing required user data');
-        }
-      } catch (parseError) {
-        console.warn('❌ Failed to parse session response:', parseError)
-        return null
-      }
-    } else {
-      console.warn('❌ Session request failed:', response.status, response.statusText)
-      
-      // Try to get error details
-      try {
-        const errorText = await response.text();
-        console.log('Error response body:', errorText);
-      } catch {
-        console.log('Could not read error response body');
-      }
-    }
-    
-    console.log('=== SESSION VALIDATION DEBUG END ===');
-    return null
-  } catch (error) {
-    console.error('❌ Error getting session:', error)
-    return null
+// This function is the correct way to get the session on the server-side in this environment.
+// It programmatically creates a request to the /api/auth/session endpoint and handles it with Auth.js.
+async function getServerSession(request: Request): Promise<AuthSession | null> {
+  const { env } = getContext();
+  console.log('[auth-helpers] Attempting to get server session...');
+  const isDev = env.NEXTJS_ENV === 'development';
+  const cookieName = isDev ? "authjs.session-token" : "__Secure-authjs.session-token";
+  const cookies = request.headers.get('Cookie');
+    const sessionToken = cookies?.match(new RegExp(`${cookieName}=([^;]+)`))?.[1];
+  console.log(`[auth-helpers] Cookie name: ${cookieName}`);
+  console.log(`[auth-helpers] Session token from cookie: ${sessionToken ? 'found' : 'not found'}`);
+
+    if (!sessionToken) {
+    console.log('[auth-helpers] No session token found in cookies.');
+    return null;
   }
+
+  const adapter = D1Adapter(env.DB);
+  if (!adapter?.getSessionAndUser) {
+    return null;
+  }
+    const sessionAndUser = await adapter.getSessionAndUser(sessionToken);
+  console.log(`[auth-helpers] D1 Adapter returned: ${sessionAndUser ? 'session and user found' : 'null'}`);
+  const { session, user } = sessionAndUser ?? { session: null, user: null };
+
+    if (!session || !user) {
+    console.log('[auth-helpers] Session or user is null, returning null from getServerSession.');
+    return null;
+  }
+
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+    },
+    expires: session.expires.toISOString(),
+  };
+}
+
+export async function getSession(request: Request): Promise<AuthSession | null> {
+        return getServerSession(request);
 }
 
 /**
  * Require authentication for an API endpoint with enhanced validation
  */
-export async function requireAuth(request: Request, env: CloudflareEnv): Promise<AuthSession> {
-  const session = await getSession(request, env)
+export async function requireAuth(request: Request): Promise<AuthSession> {
+    const session = await getServerSession(request);
   
   if (!session?.user) {
     throw new Response(JSON.stringify({ 
