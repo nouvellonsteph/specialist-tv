@@ -6,7 +6,6 @@ import { Stream } from '@cloudflare/stream-react';
 import { Video } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount } from '../utils/dateUtils';
-import VideoActions from './VideoActions';
 import { User } from '../services/user-manager';
 
 interface VideoPlayerMainProps {
@@ -416,25 +415,6 @@ export function VideoPlayerMain({ video, onBack, onSeekTime, onVideoRefresh, onT
             <span className="capitalize">Status: {video.status}</span>
           </div>
         </div>
-        
-        {/* Quick Actions - Only show in creator mode */}
-        {showQuickActions && (
-          <div className="mt-6 bg-gray-50 rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center mb-4">
-              <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <h4 className="text-sm font-medium text-gray-900">Quick Actions</h4>
-            </div>
-            <VideoActions 
-              video={video} 
-              onActionsComplete={() => {
-                // Refresh data when actions complete
-                onVideoRefresh?.();
-              }} 
-            />
-          </div>
-        )}
       </div>
     </div>
   );
