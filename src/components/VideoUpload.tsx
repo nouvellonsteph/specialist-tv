@@ -126,90 +126,102 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
     try {
       setUploadProgress('Preparing upload...');
       
-      const formData = new FormData();
-      formData.append('video', selectedFile);
-      formData.append('title', title.trim());
-      if (description.trim()) {
-        formData.append('description', description.trim());
-      }
-
-      const response = await fetch('/api/videos/upload', {
+      // Step 1: Get direct upload URL from Cloudflare Stream
+      const prepareResponse = await fetch('/api/videos/prepare-upload', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         credentials: 'same-origin',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const result = await response.json() as {
-          video_id: string;
-          stream_id: string;
-          upload_url: string;
-        };
-        
-        console.log('Stream upload details:', {
-          uploadUrl: result.upload_url,
-          fileName: selectedFile.name,
-          fileSize: selectedFile.size,
-          fileType: selectedFile.type
-        });
-        
-        // Upload with progress tracking
-        await uploadFileWithProgress(selectedFile, result.upload_url);
-        
-        setUploadProgress('Upload complete! Processing video...');
-        setUploadPercentage(100);
-        
-        // Create video object for immediate UI update
-        const currentTime = new Date().toISOString();
-        const newVideo: Video = {
-          id: result.video_id,
+        body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || undefined,
-          stream_id: result.stream_id,
-          upload_date: currentTime,
-          status: 'processing',
-          created_at: currentTime,
-          updated_at: currentTime,
-        };
+        }),
+      });
 
-        onVideoUploaded(newVideo);
-        
-        // Trigger sync to check if video is ready and start processing
-        try {
-          setUploadProgress('Checking video status...');
-          const syncResponse = await fetch('/api/videos/sync', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'same-origin',
-          });
-          
-          if (syncResponse.ok) {
-            console.log('Video sync triggered successfully');
-          } else {
-            console.warn('Video sync failed, but upload was successful');
-          }
-        } catch (syncError) {
-          console.warn('Could not trigger video sync:', syncError);
-        }
-        
-        // Reset form
-        setSelectedFile(null);
-        setTitle('');
-        setDescription('');
-        setError(null);
-        setUploadProgress(null);
-        setUploadPercentage(0);
-        
-        // Reset file input
-        const fileInput = document.getElementById('video-file') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-        
-      } else {
-        const errorData = await response.json() as { error: string };
-        setError(`Upload failed: ${errorData.error}`);
+      if (!prepareResponse.ok) {
+        const errorData = await prepareResponse.json() as { error: string };
+        throw new Error(`Failed to prepare upload: ${errorData.error}`);
       }
+
+      const uploadData = await prepareResponse.json() as {
+        video_id: string;
+        stream_id: string;
+        upload_url: string;
+        thumbnail_url: string;
+      };
+        
+      console.log('Direct upload details:', {
+        uploadUrl: uploadData.upload_url,
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type
+      });
+        
+      // Step 2: Upload directly to Cloudflare Stream with progress tracking
+      await uploadFileWithProgress(selectedFile, uploadData.upload_url);
+      
+      setUploadProgress('Upload complete! Finalizing...');
+      setUploadPercentage(100);
+      
+      // Step 3: Create database record after successful upload
+      const finalizeResponse = await fetch('/api/videos/finalize-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          video_id: uploadData.video_id,
+          stream_id: uploadData.stream_id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          thumbnail_url: uploadData.thumbnail_url,
+        }),
+      });
+
+      if (!finalizeResponse.ok) {
+        const errorData = await finalizeResponse.json() as { error: string };
+        throw new Error(`Failed to finalize upload: ${errorData.error}`);
+      }
+
+      const finalizeData = await finalizeResponse.json() as { video: Video };
+      
+      setUploadProgress('Video uploaded successfully!');
+      onVideoUploaded(finalizeData.video);
+        
+      // Trigger sync to check if video is ready and start processing
+      try {
+        setUploadProgress('Checking video status...');
+        const syncResponse = await fetch('/api/videos/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'same-origin',
+        });
+        
+        if (syncResponse.ok) {
+          console.log('Video sync triggered successfully');
+        } else {
+          console.warn('Video sync failed, but upload was successful');
+        }
+      } catch (syncError) {
+        console.warn('Could not trigger video sync:', syncError);
+      }
+        
+      // Reset form
+      setSelectedFile(null);
+      setTitle('');
+      setDescription('');
+      setError(null);
+      setUploadProgress(null);
+      setUploadPercentage(0);
+        
+      // Reset file input
+      const fileInput = document.getElementById('video-file') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+        
     } catch (error) {
       console.error('Upload error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Upload failed. Please try again.';
