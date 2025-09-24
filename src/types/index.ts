@@ -109,31 +109,6 @@ export interface WebhookData {
   [key: string]: unknown;
 }
 
-export interface CloudflareEnv {
-  AUTH_SECRET?: string;
-  AUTH_URL?: string;
-  NEXTJS_ENV?: string;
-  DB: D1Database;
-  THUMBNAILS: R2Bucket;
-  VIDEO_PROCESSING_QUEUE: Queue;
-  AI: Ai;
-  VIDEO_EMBEDDINGS: VectorizeIndex;
-  STREAM_API_TOKEN: string;
-  STREAM_ACCOUNT_ID: string;
-  WEBHOOK_SECRET?: string;
-  ADMIN_USERNAME?: string;
-  ADMIN_PASSWORD?: string;
-  OIDC_CLIENT_ID?: string;
-  OIDC_CLIENT_SECRET?: string;
-  OIDC_ISSUER?: string;
-  OIDC_REDIRECT_URI?: string;
-  GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
-  YOUTUBE_API_KEY?: string;
-  BROWSER?: Fetcher;
-  ENVIRONMENT?: string;
-}
-
 // Cloudflare Stream API response types
 export interface StreamUploadResponse {
   result: {

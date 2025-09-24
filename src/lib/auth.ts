@@ -1,15 +1,11 @@
 import { D1Adapter } from "@auth/d1-adapter";
 import { AuthConfig } from "@auth/core/types";
-import { CloudflareEnv } from "../types";
 import Google from "@auth/core/providers/google";
 
 export function getAuthConfig(env: CloudflareEnv): AuthConfig {
   console.log('=== AUTH CONFIG DEBUG START ===');
   console.log('Environment variables check:');
   console.log('- AUTH_SECRET:', env.AUTH_SECRET ? '✓ SET' : '✗ MISSING');
-  console.log('- OIDC_CLIENT_ID:', env.OIDC_CLIENT_ID ? '✓ SET' : '✗ MISSING');
-  console.log('- OIDC_CLIENT_SECRET:', env.OIDC_CLIENT_SECRET ? '✓ SET' : '✗ MISSING');
-  console.log('- OIDC_ISSUER:', env.OIDC_ISSUER ? '✓ SET' : '✗ MISSING');
   console.log('- GOOGLE_CLIENT_ID:', env.GOOGLE_CLIENT_ID ? '✓ SET' : '✗ MISSING');
   console.log('- GOOGLE_CLIENT_SECRET:', env.GOOGLE_CLIENT_SECRET ? '✓ SET' : '✗ MISSING');
   console.log('- DB:', env.DB ? '✓ AVAILABLE' : '✗ MISSING');
@@ -26,29 +22,6 @@ export function getAuthConfig(env: CloudflareEnv): AuthConfig {
     // Use JWT strategy in development when DB is not available
     ...(env.DB ? { adapter: D1Adapter(env.DB) } : {}),
     providers: [
-      {
-        id: "cloudflare-access",
-        name: "Cloudflare Access",
-        type: "oidc",
-        issuer: env.OIDC_ISSUER,
-        clientId: env.OIDC_CLIENT_ID,
-        clientSecret: env.OIDC_CLIENT_SECRET,
-        authorization: {
-          params: { scope: "openid profile email groups" },
-        },
-        checks: ["state"],
-        client: {
-          token_endpoint_auth_method: "client_secret_post",
-        },
-        profile(profile) {
-          return {
-            id: profile.sub,
-            name: profile.name || profile.preferred_username || profile.email?.split('@')[0],
-            email: profile.email,
-            image: profile.picture,
-          };
-        },
-      },
       Google({
         clientId: env.GOOGLE_CLIENT_ID!,
         clientSecret: env.GOOGLE_CLIENT_SECRET!,
@@ -158,7 +131,7 @@ export function getAuthConfig(env: CloudflareEnv): AuthConfig {
       async signIn({ user, account }) {
         console.log('🔵 Auth.js signIn callback:', { user: user?.email, provider: account?.provider });
         // Allow sign in for Google and Cloudflare Access
-        if (account?.provider === 'google' || account?.provider === 'cloudflare-access') {
+        if (account?.provider === 'google') {
           return true;
         }
         return false;

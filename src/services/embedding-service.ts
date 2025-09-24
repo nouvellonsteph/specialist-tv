@@ -1,4 +1,3 @@
-import { CloudflareEnv } from '../types';
 
 export interface VideoEmbedding {
   id: string;

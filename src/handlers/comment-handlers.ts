@@ -1,4 +1,3 @@
-import { CloudflareEnv } from '../types';
 import { CommentsAPI } from '../api/comments';
 import { decodeJWTToken } from '../utils/jwt';
 

@@ -1,4 +1,3 @@
-import { CloudflareEnv } from '../types';
 
 export interface Migration {
   id: string;

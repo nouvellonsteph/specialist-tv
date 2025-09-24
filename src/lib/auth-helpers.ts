@@ -1,6 +1,5 @@
 import { Auth } from "@auth/core"
 import { getAuthConfig } from "./auth"
-import { CloudflareEnv } from "../types"
 
 export interface AuthSession {
   user?: {
@@ -44,7 +43,7 @@ export async function getSession(request: Request, env: CloudflareEnv): Promise<
       }
     }
     
-    const authConfig = getAuthConfig(env, env.DB)
+    const authConfig = getAuthConfig(env)
     
     // Create a session request to validate authentication
     const url = new URL(request.url);

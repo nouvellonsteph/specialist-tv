@@ -1,6 +1,5 @@
 import { Auth } from "@auth/core"
 import { getAuthConfig } from "../../../../lib/auth"
-import { CloudflareEnv } from "../../../../types"
 
 async function handler(request: Request) {
   console.log(`--- Auth Handler Request: ${request.method} ${request.url} ---`);
@@ -34,20 +33,6 @@ async function handler(request: Request) {
     return new Response("Environment not available", { status: 500 })
   }
 
-  // Validate OIDC configuration
-  if (!env.OIDC_CLIENT_ID || !env.OIDC_ISSUER || !env.OIDC_REDIRECT_URI) {
-    console.error('Missing OIDC configuration:', {
-      clientId: !!env.OIDC_CLIENT_ID,
-      issuer: !!env.OIDC_ISSUER,
-      redirectUri: !!env.OIDC_REDIRECT_URI
-    })
-    return new Response(JSON.stringify({ 
-      message: 'OIDC not configured. Please set OIDC_CLIENT_ID, OIDC_ISSUER, and OIDC_REDIRECT_URI in your environment variables.' 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
-  }
 
   const authConfig = getAuthConfig(env)
   

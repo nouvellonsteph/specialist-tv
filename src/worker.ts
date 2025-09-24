@@ -1,6 +1,6 @@
 // Simplified Worker for Queue Processing and OpenNext integration
 import { default as handler } from '../.open-next/worker.js';
-import { CloudflareEnv, ProcessingJob } from './types';
+import { ProcessingJob } from './types';
 import { handleVideoProcessing } from './queue/video-processor';
 
 const corsHeaders = {

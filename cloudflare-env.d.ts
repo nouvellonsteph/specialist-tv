@@ -3,18 +3,18 @@
 // Runtime types generated with workerd@1.20250730.0 2025-03-01 global_fetch_strictly_public,nodejs_compat
 declare namespace Cloudflare {
 	interface Env {
-		NEXTJS_ENV: string;
-		STREAM_ACCOUNT_ID: string;
+		AUTH_SECRET?: string;
+		AUTH_URL?: string;
+		NEXTJS_ENV?: string;
 		STREAM_API_TOKEN: string;
-		WEBHOOK_SECRET: string;
-		AUTH_SECRET: string;
-		OIDC_CLIENT_ID: string;
-		OIDC_CLIENT_SECRET: string;
-		OIDC_ISSUER: string;
-		OIDC_REDIRECT_URI: string;
-		YOUTUBE_API_KEY: string;
-		GOOGLE_CLIENT_ID: string;
-		GOOGLE_CLIENT_SECRET: string;
+		STREAM_ACCOUNT_ID: string;
+		WEBHOOK_SECRET?: string;
+		ADMIN_USERNAME?: string;
+		ADMIN_PASSWORD?: string;
+		GOOGLE_CLIENT_ID?: string;
+		GOOGLE_CLIENT_SECRET?: string;
+		YOUTUBE_API_KEY?: string;
+		ENVIRONMENT?: string;
 		THUMBNAILS: R2Bucket;
 		DB: D1Database;
 		VIDEO_PROCESSING_QUEUE: Queue;
