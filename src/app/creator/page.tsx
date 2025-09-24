@@ -9,11 +9,13 @@ import { SearchBar } from '../../components/SearchBar';
 import { Header } from '../../components/Header';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useSession } from 'next-auth/react';
+import { useAdminPermissions } from '../../hooks/useAdminPermissions';
 
 import { Video, VideoWithScore } from '../../types';
 
 function CreatorContent() {
   const { data: session } = useSession();
+  const { canAccessCreator, loading: permissionsLoading } = useAdminPermissions();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
@@ -207,6 +209,13 @@ function CreatorContent() {
     router.push(`/creator/${video.id}`);
   }, [router]);
 
+  // Redirect if user doesn't have creator access
+  useEffect(() => {
+    if (!permissionsLoading && session && !canAccessCreator) {
+      router.push('/tv');
+    }
+  }, [session, canAccessCreator, permissionsLoading, router]);
+
   const handleVideoUploaded = (newVideo: Video) => {
     setVideos(prev => [newVideo, ...prev]);
   };
@@ -247,6 +256,20 @@ function CreatorContent() {
   };
 
   const displayVideos = searchResults.length > 0 ? searchResults : videos;
+
+  // Show loading while checking permissions
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Redirect if no access (this should not render due to useEffect, but safety check)
+  if (session && !canAccessCreator) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

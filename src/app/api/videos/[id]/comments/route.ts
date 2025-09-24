@@ -57,7 +57,7 @@ export async function POST(
     console.log('Video chat session:', { 
       userId: session.user?.id, 
       email: session.user?.email,
-      provider: session.provider 
+      role: session.user?.role 
     });
     const { id } = await params;
     

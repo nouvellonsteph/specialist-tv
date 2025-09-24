@@ -1,24 +1,16 @@
 import { D1Adapter } from "@auth/d1-adapter";
-import { getContext } from "./context";
+import { getContext } from './context';
 
 export interface AuthSession {
-  user?: {
-    id: string
-    name?: string | null
-    email?: string | null
-    image?: string | null
-    emailVerified?: Date | null
-  }
-  accessToken?: string
-  provider?: string
-  oidc_sub?: string
-  googleProfile?: {
-    picture?: string
-    email_verified?: boolean
-    locale?: string
-  }
-  error?: string
-  expires: string
+  user: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    role?: string;
+    permissions?: string[];
+  };
+  expires: string;
 }
 
 
@@ -55,12 +47,32 @@ async function getServerSession(request: Request): Promise<AuthSession | null> {
     return null;
   }
 
+  // Get user role and permissions from database
+  let userRole = 'viewer';
+  let userPermissions: string[] = [];
+  
+  try {
+    // Get user by email from database
+    const userRecord = await env.DB.prepare(`
+      SELECT id, role, permissions FROM users WHERE email = ? AND is_active = true
+    `).bind(user.email!).first();
+    
+    if (userRecord) {
+      userRole = (userRecord.role as string) || 'viewer';
+      userPermissions = userRecord.permissions ? JSON.parse(userRecord.permissions as string) : [];
+    }
+  } catch (error) {
+    console.log('[auth-helpers] Error fetching user role/permissions:', error);
+  }
+
   return {
     user: {
       id: user.id,
       name: user.name,
       email: user.email,
       image: user.image,
+      role: userRole,
+      permissions: userPermissions,
     },
     expires: session.expires.toISOString(),
   };
@@ -110,9 +122,9 @@ export function getUserFromSession(session: AuthSession | null): {
   id: string; 
   email: string; 
   name: string;
-  provider?: string;
   image?: string;
-  emailVerified?: boolean;
+  role?: string;
+  permissions?: string[];
 } | null {
   if (!session?.user) {
     return null
@@ -122,31 +134,38 @@ export function getUserFromSession(session: AuthSession | null): {
     id: session.user.id,
     email: session.user.email || 'unknown',
     name: session.user.name || session.user.email?.split('@')[0] || 'unknown',
-    provider: session.provider,
     image: session.user.image || undefined,
-    emailVerified: session.user.emailVerified ? true : false,
+    role: session.user.role,
+    permissions: session.user.permissions,
   }
 }
 
 /**
- * Check if user has Google OAuth access for enhanced features
+ * Check if user has specific role
  */
-export function hasGoogleAccess(session: AuthSession | null): boolean {
-  return session?.provider === 'google' && !!session.accessToken
+export function hasRole(session: AuthSession | null, role: string): boolean {
+  return session?.user?.role === role;
 }
 
 /**
- * Get Google profile information if available
+ * Check if user has specific permission
  */
-export function getGoogleProfile(session: AuthSession | null): {
-  picture?: string;
-  emailVerified?: boolean;
-  locale?: string;
-} | null {
-  if (session?.provider === 'google' && session.googleProfile) {
-    return session.googleProfile
-  }
-  return null
+export function hasPermission(session: AuthSession | null, permission: string): boolean {
+  return session?.user?.permissions?.includes(permission) || false;
+}
+
+/**
+ * Check if user is admin
+ */
+export function isAdmin(session: AuthSession | null): boolean {
+  return hasRole(session, 'admin');
+}
+
+/**
+ * Check if user can create content
+ */
+export function canCreate(session: AuthSession | null): boolean {
+  return hasPermission(session, 'create_videos') || hasRole(session, 'admin') || hasRole(session, 'creator');
 }
 
 /**

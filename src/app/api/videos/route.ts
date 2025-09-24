@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { VideoAPI } from '@/api/videos';
-import { requireAuth, getUserFromSession } from '@/lib/auth-helpers';
+import { requirePermission, PERMISSIONS } from '@/lib/rbac';
+import { getUserFromSession } from '@/lib/auth-helpers';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,8 +42,8 @@ export async function POST(request: NextRequest) {
   try {
     const { env } = await getCloudflareContext();
     
-    // Check authentication
-    const session = await requireAuth(request);
+    // Require upload permission
+    const session = await requirePermission(request, PERMISSIONS.UPLOAD_VIDEOS);
     const user = getUserFromSession(session);
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

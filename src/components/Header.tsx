@@ -2,14 +2,58 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { getProxiedAvatarUrl } from '@/utils/avatar';
 
 interface HeaderProps {
   videoCount?: number;
   readyVideoCount?: number;
+}
+
+function CreatorNavigationLink({ isActive }: { isActive: (path: string) => boolean }) {
+  const { canAccessCreator } = useAdminPermissions();
+  
+  if (!canAccessCreator) {
+    return null;
+  }
+  
+  return (
+    <Link 
+      href="/creator" 
+      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+        isActive('/creator') 
+          ? 'border-blue-500 text-blue-600' 
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      Creator
+    </Link>
+  );
+}
+
+function AdminNavigationLink({ isActive }: { isActive: (path: string) => boolean }) {
+  const { canAccessAdmin } = useAdminPermissions();
+  
+  if (!canAccessAdmin) {
+    return null;
+  }
+  
+  return (
+    <Link 
+      href="/admin" 
+      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+        isActive('/admin') 
+          ? 'border-blue-500 text-blue-600' 
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      Admin
+    </Link>
+  );
 }
 
 export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
@@ -58,16 +102,8 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
               >
                 TV
               </Link>
-              <Link 
-                href="/creator" 
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  isActive('/creator') 
-                    ? 'border-blue-500 text-blue-600' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Creator
-              </Link>
+              <CreatorNavigationLink isActive={isActive} />
+              <AdminNavigationLink isActive={isActive} />
             </nav>
           </div>
           
@@ -87,7 +123,7 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
                   <div className="flex items-center space-x-2">
                     {session.user.image ? (
                       <Image
-                        src={session.user.image}
+                        src={getProxiedAvatarUrl(session.user.image) || session.user.image}
                         alt={session.user.name || 'User'}
                         width={32}
                         height={32}

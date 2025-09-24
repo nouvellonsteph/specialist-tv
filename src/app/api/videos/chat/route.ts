@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     console.log('Video chat session:', { 
       userId: session.user?.id, 
       email: session.user?.email,
-      provider: session.provider 
+      role: session.user?.role 
     });
     
     const { message, transcript, videoTitle, videoDescription } = await request.json() as {

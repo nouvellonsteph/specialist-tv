@@ -32,9 +32,10 @@ export async function POST(request: NextRequest) {
         user: {
           id: session.user.id,
           email: session.user.email,
-          name: session.user.name
+          name: session.user.name,
+          role: session.user.role,
+          permissions: session.user.permissions
         },
-        provider: session.provider,
         expires: session.expires
       },
       { headers: corsHeaders }
