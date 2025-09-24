@@ -389,17 +389,72 @@ export function UserManagement({ onClose }: UserManagementProps) {
                 <li key={entry.id}>
                   <div className="px-4 py-4">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium text-gray-900">{entry.action}</div>
+                      <div className="flex items-center space-x-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {entry.action.replace(/_/g, ' ').toUpperCase()}
+                        </span>
+                        {entry.target_user_name && (
+                          <span className="text-sm text-gray-600">
+                            → {entry.target_user_name} ({entry.target_user_email})
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-600">{formatDate(entry.created_at)}</div>
                     </div>
-                    <div className="mt-1 text-sm text-gray-900">
-                      {entry.target_user_id && (
-                        <span>Target: {entry.target_user_id} | </span>
-                      )}
-                      Performed by: {entry.performed_by || 'System'}
+                    
+                    <div className="mt-2 text-sm text-gray-900">
+                      <span className="font-medium">Performed by:</span> {entry.performed_by_name || entry.performed_by_email || entry.performed_by || 'System'}
                     </div>
-                    {entry.ip_address && (
-                      <div className="mt-1 text-xs text-gray-600">IP: {entry.ip_address}</div>
+                    
+                    {/* Show old and new values */}
+                    {(entry.old_values || entry.new_values) && (
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {entry.old_values && (
+                          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                            <h4 className="text-xs font-semibold text-red-800 mb-2">BEFORE</h4>
+                            <div className="space-y-1">
+                              {Object.entries(entry.old_values).map(([key, value]) => (
+                                <div key={key} className="text-xs">
+                                  <span className="font-medium text-red-700">{key}:</span>
+                                  <span className="ml-1 text-red-600">
+                                    {Array.isArray(value) ? value.join(', ') : String(value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {entry.new_values && (
+                          <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                            <h4 className="text-xs font-semibold text-green-800 mb-2">AFTER</h4>
+                            <div className="space-y-1">
+                              {Object.entries(entry.new_values).map(([key, value]) => (
+                                <div key={key} className="text-xs">
+                                  <span className="font-medium text-green-700">{key}:</span>
+                                  <span className="ml-1 text-green-600">
+                                    {Array.isArray(value) ? value.join(', ') : String(value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Additional metadata */}
+                    {(entry.ip_address || entry.user_agent) && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                          {entry.ip_address && (
+                            <span><strong>IP:</strong> {entry.ip_address}</span>
+                          )}
+                          {entry.user_agent && (
+                            <span><strong>User Agent:</strong> {entry.user_agent.substring(0, 50)}...</span>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </li>
@@ -411,96 +466,182 @@ export function UserManagement({ onClose }: UserManagementProps) {
 
       {/* User Edit Modal */}
       {showUserModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Edit User: {selectedUser.name || selectedUser.email}
-              </h3>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Role</label>
-                <select
-                  value={userForm.role}
-                  onChange={(e) => {
-                    const newRole = e.target.value as 'admin' | 'creator' | 'viewer';
-                    setUserForm({
-                      role: newRole,
-                      permissions: ROLE_PERMISSIONS[newRole] || [],
-                    });
-                  }}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="viewer">Viewer</option>
-                  <option value="creator">Creator</option>
-                  <option value="admin">Admin</option>
-                </select>
+        <div className="fixed inset-0 bg-white bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                {selectedUser.image ? (
+                  <Image 
+                    className="h-12 w-12 rounded-full" 
+                    src={getProxiedAvatarUrl(selectedUser.image) || selectedUser.image} 
+                    alt="User avatar" 
+                    width={48} 
+                    height={48}
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-gray-300 flex items-center justify-center">
+                    <span className="text-lg font-medium text-gray-700">
+                      {(selectedUser.name || selectedUser.email || 'U').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {selectedUser.name || 'No name'}
+                  </h3>
+                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUserModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Current Status */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Current Status</h4>
+                <div className="flex items-center space-x-4">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeColor(selectedUser.role)}`}>
+                    {selectedUser.role}
+                  </span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedUser.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedUser.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {selectedUser.permissions.length} permissions
+                  </span>
+                </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Permissions</label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {AVAILABLE_PERMISSIONS.map(permission => (
-                    <label key={permission} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={userForm.permissions.includes(permission)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setUserForm(prev => ({
-                              ...prev,
-                              permissions: [...prev.permissions, permission],
-                            }));
-                          } else {
-                            setUserForm(prev => ({
-                              ...prev,
-                              permissions: prev.permissions.filter(p => p !== permission),
-                            }));
-                          }
-                        }}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-900">{permission}</span>
-                    </label>
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">Role</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['viewer', 'creator', 'admin'] as const).map(role => (
+                    <button
+                      key={role}
+                      onClick={() => {
+                        setUserForm({
+                          role: role,
+                          permissions: ROLE_PERMISSIONS[role] || [],
+                        });
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        userForm.role === role
+                          ? 'border-blue-500 bg-blue-50 text-blue-900'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${getRoleBadgeColor(role)}`}>
+                          {role === 'admin' && '👑'}
+                          {role === 'creator' && '✏️'}
+                          {role === 'viewer' && '👁️'}
+                        </div>
+                        <div className="font-medium capitalize">{role}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {ROLE_PERMISSIONS[role]?.length || 0} permissions
+                        </div>
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex justify-between space-x-4">
-                <div className="flex space-x-2">
+              {/* Permissions */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                  Permissions ({userForm.permissions.length})
+                </label>
+                <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {AVAILABLE_PERMISSIONS.map(permission => (
+                      <label key={permission} className="flex items-center space-x-3 p-2 rounded-md hover:bg-white transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={userForm.permissions.includes(permission)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setUserForm(prev => ({
+                                ...prev,
+                                permissions: [...prev.permissions, permission],
+                              }));
+                            } else {
+                              setUserForm(prev => ({
+                                ...prev,
+                                permissions: prev.permissions.filter(p => p !== permission),
+                              }));
+                            }
+                          }}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm text-gray-900 font-medium">{permission}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+              <div className="flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0 sm:space-x-3">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                   <button
                     onClick={() => handleUserAction('update_role', selectedUser.id, { role: userForm.role })}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                   >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     Update Role
                   </button>
                   <button
                     onClick={() => handleUserAction('update_permissions', selectedUser.id, { permissions: userForm.permissions })}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
                   >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
                     Update Permissions
                   </button>
                 </div>
                 
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                   {selectedUser.is_active ? (
                     <button
                       onClick={() => handleUserAction('deactivate_user', selectedUser.id)}
-                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+                      className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                     >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                      </svg>
                       Deactivate
                     </button>
                   ) : (
                     <button
                       onClick={() => handleUserAction('activate_user', selectedUser.id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                      className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
                     >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                       Activate
                     </button>
                   )}
                   <button
                     onClick={() => setShowUserModal(false)}
-                    className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                   >
                     Cancel
                   </button>

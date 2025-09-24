@@ -39,7 +39,11 @@ export interface AuditLogEntry {
   id: string;
   action: string;
   target_user_id: string | null;
+  target_user_name: string | null;
+  target_user_email: string | null;
   performed_by: string | null;
+  performed_by_name: string | null;
+  performed_by_email: string | null;
   old_values: Record<string, unknown> | null;
   new_values: Record<string, unknown> | null;
   ip_address: string | null;
@@ -591,9 +595,19 @@ export class UserManager {
     `).bind(limit).all();
 
     return result.results.map(entry => ({
-      ...entry,
+      id: entry.id as string,
+      action: entry.action as string,
+      target_user_id: entry.target_user_id as string | null,
+      target_user_name: entry.target_user_name as string | null,
+      target_user_email: entry.target_user_email as string | null,
+      performed_by: entry.performed_by as string | null,
+      performed_by_name: entry.performed_by_name as string | null,
+      performed_by_email: entry.performed_by_email as string | null,
       old_values: entry.old_values ? JSON.parse(entry.old_values as string) : null,
       new_values: entry.new_values ? JSON.parse(entry.new_values as string) : null,
+      ip_address: entry.ip_address as string | null,
+      user_agent: entry.user_agent as string | null,
+      created_at: entry.created_at as string,
     })) as AuditLogEntry[];
   }
 

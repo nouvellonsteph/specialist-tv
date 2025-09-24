@@ -108,8 +108,8 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Video Stats - show on creator and tv pages */}
-            {(pathname === '/creator' || pathname === '/tv') && videoCount > 0 && (
+            {/* Video Stats - show only on creator page */}
+            {pathname === '/creator' && videoCount > 0 && (
               <div className="text-sm text-gray-600">
                 {videoCount} videos{readyVideoCount !== undefined ? ` • ${readyVideoCount} ready` : ''}
               </div>
