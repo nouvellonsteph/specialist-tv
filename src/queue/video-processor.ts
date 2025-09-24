@@ -3,6 +3,7 @@
 import { ProcessingJob, StreamInfoResponse, WebhookPayload } from '../types';
 import { AIProcessor } from '../services/ai-processor';
 import { VideoAPI } from '../api/videos';
+import { VideoCompletionChecker } from '../api/video-completion-checker';
 
 export async function handleVideoProcessing(
   batch: MessageBatch<ProcessingJob>,
@@ -10,6 +11,7 @@ export async function handleVideoProcessing(
 ): Promise<void> {
   const aiProcessor = new AIProcessor(env);
   const videoAPI = new VideoAPI(env);
+  const completionChecker = new VideoCompletionChecker(env);
 
   for (const message of batch.messages) {
     const job = message.body;
@@ -27,15 +29,15 @@ export async function handleVideoProcessing(
           break;
           
         case 'chapters':
-          await processChapters(job, aiProcessor, videoAPI, env);
+          await processChapters(job, aiProcessor, videoAPI, env, completionChecker);
           break;
           
         case 'abstract':
-          await processAbstract(job, aiProcessor, videoAPI, env);
+          await processAbstract(job, aiProcessor, videoAPI, env, completionChecker);
           break;
           
         case 'title_generation':
-          await processTitleGeneration(job, aiProcessor, videoAPI, env);
+          await processTitleGeneration(job, aiProcessor, videoAPI, env, completionChecker);
           break;
           
         case 'thumbnail':
@@ -85,29 +87,19 @@ async function processTranscription(
   
   const transcript = await aiProcessor.generateTranscript(job.stream_id, job.video_id);
   
-  // Queue tagging, abstract, and title jobs after transcription completes
-  await env.VIDEO_PROCESSING_QUEUE.send({
-    video_id: job.video_id,
-    stream_id: job.stream_id,
-    type: 'tagging',
-    status: 'pending',
-  });
+  // Queue all remaining phases in parallel for faster processing
+  const remainingPhases = ['tagging', 'abstract', 'title_generation', 'chapters'];
   
-  await env.VIDEO_PROCESSING_QUEUE.send({
-    video_id: job.video_id,
-    stream_id: job.stream_id,
-    type: 'abstract',
-    status: 'pending',
-  });
+  for (const phase of remainingPhases) {
+    await env.VIDEO_PROCESSING_QUEUE.send({
+      video_id: job.video_id,
+      stream_id: job.stream_id,
+      type: phase,
+      status: 'pending',
+    });
+  }
   
-  await env.VIDEO_PROCESSING_QUEUE.send({
-    video_id: job.video_id,
-    stream_id: job.stream_id,
-    type: 'title_generation',
-    status: 'pending',
-  });
-  
-  console.log(`Transcription completed for video ${job.video_id}`);
+  console.log(`Transcription completed for video ${job.video_id}, queued all remaining phases`);
   
   // Send webhook notification
   await sendWebhook(env, {
@@ -146,14 +138,6 @@ async function processTagging(
     video.title
   );
   
-  // Queue chapters job after tagging completes
-  await env.VIDEO_PROCESSING_QUEUE.send({
-    video_id: job.video_id,
-    stream_id: job.stream_id,
-    type: 'chapters',
-    status: 'pending',
-  });
-  
   console.log(`Tagging completed for video ${job.video_id}:`, tags);
   
   // Send webhook notification
@@ -169,7 +153,8 @@ async function processChapters(
   job: ProcessingJob,
   aiProcessor: AIProcessor,
   videoAPI: VideoAPI,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  completionChecker: VideoCompletionChecker
 ): Promise<void> {
   console.log(`Starting chapter generation for video ${job.video_id}`);
   
@@ -205,25 +190,26 @@ async function processChapters(
     duration
   );
   
-  // Update video status to ready and set duration
-  await videoAPI.updateVideoStatus(job.video_id, 'ready', { duration });
-  
   console.log(`Chapter generation completed for video ${job.video_id}`);
   
-  // Send final webhook notification
+  // Send webhook notification
   await sendWebhook(env, {
-    event_type: 'processing_complete',
+    event_type: 'chapters_complete',
     video_id: job.video_id,
-    data: { duration, status: 'ready' },
+    data: { duration },
     timestamp: new Date().toISOString(),
   });
+  
+  // Check if all processing is complete and mark as ready if so
+  await checkAndMarkComplete(job.video_id, videoAPI, completionChecker, env, duration);
 }
 
 async function processAbstract(
   job: ProcessingJob,
   aiProcessor: AIProcessor,
   videoAPI: VideoAPI,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  completionChecker: VideoCompletionChecker
 ): Promise<void> {
   console.log(`Starting abstract generation for video ${job.video_id}`);
   
@@ -238,13 +224,17 @@ async function processAbstract(
     data: { abstract_length: abstract.length },
     timestamp: new Date().toISOString(),
   });
+  
+  // Check if all processing is complete
+  await checkAndMarkComplete(job.video_id, videoAPI, completionChecker, env);
 }
 
 async function processTitleGeneration(
   job: ProcessingJob,
   aiProcessor: AIProcessor,
   videoAPI: VideoAPI,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  completionChecker: VideoCompletionChecker
 ): Promise<void> {
   console.log(`Starting title generation for video ${job.video_id}`);
   
@@ -266,6 +256,9 @@ async function processTitleGeneration(
     data: { new_title: title },
     timestamp: new Date().toISOString(),
   });
+  
+  // Check if all processing is complete
+  await checkAndMarkComplete(job.video_id, videoAPI, completionChecker, env);
 }
 
 async function processThumbnail(
@@ -275,6 +268,30 @@ async function processThumbnail(
   // Thumbnail processing logic would go here
   // For now, this is a placeholder
   console.log(`Thumbnail processing completed for video ${job.video_id}`);
+}
+
+// Helper function to check completion and mark video as ready
+async function checkAndMarkComplete(
+  videoId: string,
+  videoAPI: VideoAPI,
+  completionChecker: VideoCompletionChecker,
+  env: CloudflareEnv,
+  duration?: number
+): Promise<void> {
+  const isComplete = await completionChecker.isProcessingComplete(videoId);
+  
+  if (isComplete) {
+    console.log(`✅ All processing complete for video ${videoId}, marking as ready`);
+    await videoAPI.updateVideoStatus(videoId, 'ready', { duration });
+    
+    // Send final webhook notification
+    await sendWebhook(env, {
+      event_type: 'processing_complete',
+      video_id: videoId,
+      data: { duration, status: 'ready' },
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
 async function sendWebhook(env: CloudflareEnv, payload: WebhookPayload): Promise<void> {

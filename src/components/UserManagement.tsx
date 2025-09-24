@@ -44,37 +44,41 @@ export function UserManagement({ onClose }: UserManagementProps) {
     expiresInDays: 7,
   });
 
-  const loadData = useCallback(async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      if (activeTab === 'users') {
-        const response = await fetch('/api/admin/users');
-        if (!response.ok) throw new Error('Failed to load users');
-        const data = await response.json() as { users: User[] };
-        setUsers(data.users);
-      } else if (activeTab === 'domains') {
-        const response = await fetch('/api/admin/domains');
-        if (!response.ok) throw new Error('Failed to load domains');
-        const data = await response.json() as { domains: AuthorizedDomain[] };
-        setDomains(data.domains);
-      } else if (activeTab === 'audit') {
-        const response = await fetch('/api/admin/audit');
-        if (!response.ok) throw new Error('Failed to load audit log');
-        const data = await response.json() as { auditLog: AuditLogEntry[] };
-        setAuditLog(data.auditLog);
-      }
+      // Load all data in parallel
+      const [usersResponse, domainsResponse, auditResponse] = await Promise.all([
+        fetch('/api/admin/users'),
+        fetch('/api/admin/domains'),
+        fetch('/api/admin/audit')
+      ]);
+      
+      if (!usersResponse.ok) throw new Error('Failed to load users');
+      if (!domainsResponse.ok) throw new Error('Failed to load domains');
+      if (!auditResponse.ok) throw new Error('Failed to load audit log');
+      
+      const [usersData, domainsData, auditData] = await Promise.all([
+        usersResponse.json() as Promise<{ users: User[] }>,
+        domainsResponse.json() as Promise<{ domains: AuthorizedDomain[] }>,
+        auditResponse.json() as Promise<{ auditLog: AuditLogEntry[] }>
+      ]);
+      
+      setUsers(usersData.users);
+      setDomains(domainsData.domains);
+      setAuditLog(auditData.auditLog);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadAllData();
+  }, [loadAllData]);
 
   const handleUserAction = async (action: string, userId: string, data?: Record<string, unknown>) => {
     try {
@@ -89,7 +93,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
         throw new Error(errorData.error || 'Action failed');
       }
       
-      await loadData();
+      await loadAllData();
       setShowUserModal(false);
       setSelectedUser(null);
     } catch (err) {
@@ -110,7 +114,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
         throw new Error(errorData.error || 'Action failed');
       }
       
-      await loadData();
+      await loadAllData();
       setShowDomainModal(false);
       setDomainForm({ domain: '', defaultRole: 'viewer', defaultPermissions: [] });
     } catch (err) {
@@ -159,7 +163,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
       
       setShowDeleteConfirm(false);
       setUserToDelete(null);
-      await loadData(); // Refresh the user list
+      await loadAllData(); // Refresh the user list
       alert('User deleted successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
@@ -204,7 +208,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
         {onClose && (
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-black"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -287,7 +291,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{user.name || 'No name'}</div>
-                        <div className="text-sm text-gray-600">{user.email}</div>
+                        <div className="text-sm text-black">{user.email}</div>
                       </div>
                     </div>
                     
@@ -348,7 +352,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
                   <div className="px-4 py-4 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{domain.domain}</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-black">
                         Default role: {domain.default_role} | 
                         Permissions: {domain.default_permissions.length}
                       </div>
@@ -394,12 +398,12 @@ export function UserManagement({ onClose }: UserManagementProps) {
                           {entry.action.replace(/_/g, ' ').toUpperCase()}
                         </span>
                         {entry.target_user_name && (
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm text-black">
                             → {entry.target_user_name} ({entry.target_user_email})
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600">{formatDate(entry.created_at)}</div>
+                      <div className="text-sm text-black">{formatDate(entry.created_at)}</div>
                     </div>
                     
                     <div className="mt-2 text-sm text-gray-900">
@@ -466,7 +470,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
 
       {/* User Edit Modal */}
       {showUserModal && selectedUser && (
-        <div className="fixed inset-0 bg-white bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.1)'}}>
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -490,12 +494,12 @@ export function UserManagement({ onClose }: UserManagementProps) {
                   <h3 className="text-xl font-semibold text-gray-900">
                     {selectedUser.name || 'No name'}
                   </h3>
-                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  <p className="text-sm text-black">{selectedUser.email}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowUserModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-black transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -517,7 +521,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
                   }`}>
                     {selectedUser.is_active ? 'Active' : 'Inactive'}
                   </span>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-black">
                     {selectedUser.permissions.length} permissions
                   </span>
                 </div>
@@ -654,56 +658,129 @@ export function UserManagement({ onClose }: UserManagementProps) {
 
       {/* Domain Add Modal */}
       {showDomainModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Authorized Domain</h3>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Domain</label>
-                <input
-                  type="text"
-                  placeholder="example.com"
-                  value={domainForm.domain}
-                  onChange={(e) => setDomainForm(prev => ({ ...prev, domain: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.1)'}}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Add Authorized Domain</h3>
+                  <p className="text-sm text-black">Configure a new domain for automatic user registration</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDomainModal(false)}
+                className="text-gray-400 hover:text-black transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Domain Input */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">Domain Name</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="example.com"
+                    value={domainForm.domain}
+                    onChange={(e) => setDomainForm(prev => ({ ...prev, domain: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-black"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Default Role</label>
-                <select
-                  value={domainForm.defaultRole}
-                  onChange={(e) => {
-                    const newRole = e.target.value as 'admin' | 'creator' | 'viewer';
-                    setDomainForm(prev => ({
-                      ...prev,
-                      defaultRole: newRole,
-                      defaultPermissions: ROLE_PERMISSIONS[newRole] || [],
-                    }));
-                  }}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="viewer">Viewer</option>
-                  <option value="creator">Creator</option>
-                  <option value="admin">Admin</option>
-                </select>
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">Default Role</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['viewer', 'creator', 'admin'] as const).map(role => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => {
+                        setDomainForm(prev => ({
+                          ...prev,
+                          defaultRole: role,
+                          defaultPermissions: ROLE_PERMISSIONS[role] || [],
+                        }));
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all hover:shadow-md ${
+                        domainForm.defaultRole === role
+                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${getRoleBadgeColor(role)}`}>
+                          {role === 'admin' && '👑'}
+                          {role === 'creator' && '✏️'}
+                          {role === 'viewer' && '👁️'}
+                        </div>
+                        <div className="font-medium capitalize">{role}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {ROLE_PERMISSIONS[role]?.length || 0} permissions
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => handleDomainAction('add_domain', domainForm)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Add Domain
-                </button>
-                <button
-                  onClick={() => setShowDomainModal(false)}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
+              {/* Permissions Preview */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                  Default Permissions ({domainForm.defaultPermissions.length})
+                </label>
+                <div className="bg-gray-50 rounded-lg p-4 max-h-32 overflow-y-auto">
+                  {domainForm.defaultPermissions.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {domainForm.defaultPermissions.map(permission => (
+                        <div key={permission} className="flex items-center space-x-2 text-sm text-gray-700">
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>{permission.replace(/_/g, ' ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-2">No permissions selected</p>
+                  )}
+                </div>
               </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end space-x-4 p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setShowDomainModal(false)}
+                className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDomainAction('add_domain', domainForm)}
+                disabled={!domainForm.domain.trim()}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add Domain</span>
+              </button>
             </div>
           </div>
         </div>
@@ -711,64 +788,143 @@ export function UserManagement({ onClose }: UserManagementProps) {
 
       {/* Invite User Modal */}
       {showInviteModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Invite User</h3>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
-                <input
-                  type="email"
-                  placeholder="user@example.com"
-                  value={inviteForm.email}
-                  onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.1)'}}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Invite New User</h3>
+                  <p className="text-sm text-black">Send an invitation to join the platform</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="text-gray-400 hover:text-black transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Email Input */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">Email Address</label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    placeholder="user@example.com"
+                    value={inviteForm.email}
+                    onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-black"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                  </svg>
+                </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Role</label>
-                <select
-                  value={inviteForm.role}
-                  onChange={(e) => {
-                    const newRole = e.target.value as 'admin' | 'creator' | 'viewer';
-                    setInviteForm(prev => ({
-                      ...prev,
-                      role: newRole,
-                      permissions: ROLE_PERMISSIONS[newRole] || [],
-                    }));
-                  }}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="viewer">Viewer</option>
-                  <option value="creator">Creator</option>
-                  <option value="admin">Admin</option>
-                </select>
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">Role</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['viewer', 'creator', 'admin'] as const).map(role => (
+                    <button
+                      key={role}
+                      onClick={() => {
+                        setInviteForm(prev => ({
+                          ...prev,
+                          role: role,
+                          permissions: ROLE_PERMISSIONS[role] || [],
+                        }));
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        inviteForm.role === role
+                          ? 'border-blue-500 bg-blue-50 text-blue-900'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${getRoleBadgeColor(role)}`}>
+                          {role === 'admin' && '👑'}
+                          {role === 'creator' && '✏️'}
+                          {role === 'viewer' && '👁️'}
+                        </div>
+                        <div className="font-medium capitalize">{role}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {ROLE_PERMISSIONS[role]?.length || 0} permissions
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-900 mb-2">Expires in (days)</label>
-                <input
-                  type="number"
-                  value={inviteForm.expiresInDays}
-                  onChange={(e) => setInviteForm(prev => ({ ...prev, expiresInDays: parseInt(e.target.value) }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
+              {/* Permissions Preview */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                  Permissions ({inviteForm.permissions.length})
+                </label>
+                <div className="bg-gray-50 rounded-lg p-4 max-h-32 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {inviteForm.permissions.map(permission => (
+                      <div key={permission} className="flex items-center space-x-2 p-2 bg-white rounded-md">
+                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-sm text-gray-900 font-medium">{permission}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={handleInviteUser}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Send Invitation
-                </button>
+              {/* Expiration */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-3">Invitation Expires</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={inviteForm.expiresInDays}
+                    onChange={(e) => setInviteForm(prev => ({ ...prev, expiresInDays: parseInt(e.target.value) || 7 }))}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-black"
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">days</span>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Invitation will expire on {new Date(Date.now() + inviteForm.expiresInDays * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+              <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
                 <button
                   onClick={() => setShowInviteModal(false)}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={handleInviteUser}
+                  disabled={!inviteForm.email.trim()}
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  Send Invitation
                 </button>
               </div>
             </div>
@@ -778,8 +934,8 @@ export function UserManagement({ onClose }: UserManagementProps) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && userToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50" style={{backgroundColor: 'rgba(255, 255, 255, 0.1)'}}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete User Account</h3>
             <p className="text-gray-600 mb-6">
               Are you sure you want to delete <strong>{userToDelete.name || userToDelete.email}</strong>? 

@@ -41,6 +41,23 @@ const worker = {
   // Queue consumer
   async queue(batch: MessageBatch<ProcessingJob>, env: CloudflareEnv): Promise<void> {
     await handleVideoProcessing(batch, env);
+  },
+
+  // Scheduled event handler (cron jobs)
+  async scheduled(_event: ScheduledEvent, env: CloudflareEnv): Promise<void> {
+    console.log('Running scheduled video sync at:', new Date().toISOString());
+    
+    try {
+      const { VideoAPI } = await import('./api/videos');
+      const videoAPI = new VideoAPI(env);
+      
+      // Sync all processing videos
+      await videoAPI.syncAllProcessingVideos();
+      
+      console.log('Scheduled video sync completed successfully');
+    } catch (error) {
+      console.error('Error in scheduled video sync:', error);
+    }
   }
 }
 

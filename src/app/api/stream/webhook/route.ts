@@ -89,12 +89,12 @@ export async function POST(request: NextRequest) {
 
     // Handle different webhook events based on actual Stream webhook format
     if (webhook.status?.state === 'ready' || webhook.readyToStream === true) {
-      console.log(`Video ${videoId} is ready, starting processing pipeline`);
+      console.log(`🎬 Video ${videoId} is ready for processing, starting immediate pipeline`);
       
       // Update video status to ready first
       await videoAPI.syncVideoStatusFromStream(videoId);
       
-      // Start processing pipeline
+      // Start processing pipeline immediately - all phases will run in parallel after transcription
       await env.VIDEO_PROCESSING_QUEUE.send({
         video_id: videoId,
         stream_id: streamId,
@@ -102,10 +102,13 @@ export async function POST(request: NextRequest) {
         status: 'pending',
       });
 
-      console.log(`Started processing pipeline for video ${videoId}`);
+      console.log(`✅ Started immediate processing pipeline for video ${videoId}`);
+    } else if (webhook.status?.state === 'inprogress') {
+      console.log(`🔄 Video ${videoId} is still encoding (${webhook.status.pctComplete}% complete)`);
+      await videoAPI.syncVideoStatusFromStream(videoId);
     } else {
       // For other webhook events, just sync the status
-      console.log(`Syncing status for video ${videoId} due to webhook`);
+      console.log(`📊 Syncing status for video ${videoId} due to webhook (state: ${webhook.status?.state})`);
       await videoAPI.syncVideoStatusFromStream(videoId);
     }
 

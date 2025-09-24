@@ -63,7 +63,8 @@ export function LoginForm({ onLogin, onClose, error }: LoginFormProps) {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4"
+      style={{backgroundColor: 'rgba(255, 255, 255, 0.1)'}}
       onClick={handleOverlayClick}
     >
       {/* Compact login modal */}
@@ -74,10 +75,10 @@ export function LoginForm({ onLogin, onClose, error }: LoginFormProps) {
         <div className="text-center mb-6">
           <div className="text-2xl mb-2">📺</div>
           <h2 className="text-xl font-bold text-gray-900">
-            Creator Login
+            Sign in
           </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Sign in to access video management
+          <p className="text-sm text-black mt-1">
+            Access your Specialist TV account
           </p>
         </div>
         
@@ -122,7 +123,7 @@ export function LoginForm({ onLogin, onClose, error }: LoginFormProps) {
               required
               value={credentials.username}
               onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-black"
               placeholder="Enter username"
             />
           </div>
@@ -138,7 +139,7 @@ export function LoginForm({ onLogin, onClose, error }: LoginFormProps) {
               required
               value={credentials.password}
               onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-black"
               placeholder="Enter password"
             />
           </div>

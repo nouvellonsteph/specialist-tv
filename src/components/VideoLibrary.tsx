@@ -4,6 +4,7 @@ import { Video, VideoWithScore } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount, formatRelativeDate } from '../utils/dateUtils';
 import React, { useState } from 'react';
+import { useSession } from 'next-auth/react';
 // Authentication handled via cookies in API endpoints
 
 interface VideoLibraryProps {
@@ -16,11 +17,12 @@ interface VideoLibraryProps {
 }
 
 const VideoLibrary: React.FC<VideoLibraryProps> = ({ videos, loading, onVideoSelect, isSearching, onVideoUpdate, showStatus = true }) => {
-  // Session is handled via cookies in API endpoints
+  const { data: session } = useSession();
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState<string | null>(null);
+  const [syncingVideoId, setSyncingVideoId] = useState<string | null>(null);
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -53,10 +55,41 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ videos, loading, onVideoSel
     }
   };
 
-  // Handle canceling title edit
+  // Handle canceling edit
   const handleCancelEdit = () => {
     setEditingVideoId(null);
     setEditingTitle('');
+  };
+
+  // Handle sync video
+  const handleSyncVideo = async (videoId: string) => {
+    if (!session) return;
+    
+    try {
+      setSyncingVideoId(videoId);
+      const response = await fetch(`/api/videos/${videoId}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+      });
+      
+      if (response.ok) {
+        console.log('Video sync completed successfully');
+        // Trigger a refresh by calling onVideoUpdate with empty updates
+        // This will cause the parent component to refresh the video list
+        if (onVideoUpdate) {
+          await onVideoUpdate(videoId, {});
+        }
+      } else {
+        console.error('Failed to sync video');
+      }
+    } catch (error) {
+      console.error('Error syncing video:', error);
+    } finally {
+      setSyncingVideoId(null);
+    }
   };
 
   // Handle key press in edit input
@@ -470,10 +503,26 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ videos, loading, onVideoSel
                         
                         {/* Status badge - only show in Creator mode */}
                         {showStatus && (
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(video.status)}`}>
-                            {getStatusIcon(video.status)}
-                            <span className="ml-1 capitalize">{video.status}</span>
-                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(video.status)}`}>
+                              {getStatusIcon(video.status)}
+                              <span className="ml-1 capitalize">{video.status}</span>
+                            </span>
+                            {/* Sync button for processing/ready videos */}
+                            {session && (video.status === 'processing' || video.status === 'ready') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSyncVideo(video.id);
+                                }}
+                                disabled={syncingVideoId === video.id}
+                                className="px-2 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                title="Force sync video status"
+                              >
+                                {syncingVideoId === video.id ? 'Syncing...' : 'Sync'}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

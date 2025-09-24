@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import VideoLogs from './VideoLogs';
 import VTTViewer from './VTTViewer';
 import { VideoChat } from './VideoChat';
+import VideoProcessingControls from './VideoProcessingControls';
 import { Video, Tag, VideoWithScore } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount } from '../utils/dateUtils';
@@ -31,7 +32,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
   const [relatedVideos, setRelatedVideos] = useState<VideoWithScore[]>([]);
   const [transcript, setTranscript] = useState<string>('');
   const [tags, setTags] = useState<Tag[]>([]);
-  const [activeTab, setActiveTab] = useState<'chapters' | 'details' | 'transcript' | 'vtt' | 'related' | 'logs' | 'chat' | 'tags'>('chapters');
+  const [activeTab, setActiveTab] = useState<'chapters' | 'details' | 'transcript' | 'vtt' | 'related' | 'logs' | 'chat' | 'tags' | 'processing'>('chapters');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -121,7 +122,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
     
     try {
       setSyncing(true);
-      const response = await fetch('/api/videos/sync', {
+      const response = await fetch(`/api/videos/${video.id}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,13 +210,30 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
         </div>
       </div>
 
+      {/* Sync Button - Above Tabs */}
+      {status === 'authenticated' && (video.status === 'processing' || video.status === 'ready') && (
+        <div className="mx-4 mb-3 flex justify-end">
+          <button
+            onClick={handleSyncVideo}
+            disabled={syncing}
+            className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+            title="Force sync video status and trigger processing if needed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>{syncing ? 'Syncing...' : 'Sync Video'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-gray-200 mx-4 flex-shrink-0">
         <nav className="-mb-px flex overflow-x-auto scrollbar-hide">
-          {['chapters', 'details', 'transcript', 'vtt', 'tags', 'related', 'logs', 'chat'].map((tab) => (
+          {['chapters', 'details', 'transcript', 'vtt', 'tags', 'related', 'logs', 'chat', ...(session ? ['processing'] : [])].map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as 'chapters' | 'details' | 'transcript' | 'vtt' | 'tags' | 'related' | 'logs' | 'chat')}
+              onClick={() => setActiveTab(tab as typeof activeTab)}
               className={`py-2 px-2 lg:px-3 border-b-2 font-medium text-xs lg:text-sm whitespace-nowrap flex-shrink-0 transition-colors ${
                 activeTab === tab
                   ? 'border-orange-500 text-orange-600 bg-orange-50'
@@ -226,8 +244,11 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
               {tab === 'chapters' && chapters.length > 0 && (
                 <span className="ml-1 text-xs text-gray-500">({chapters.length})</span>
               )}
-              {tab === 'related' && relatedVideos.length > 0 && (
-                <span className="ml-1 text-xs text-gray-500">({relatedVideos.length})</span>
+              {tab === 'tags' && tags.length > 0 && (
+                <span className="ml-1 text-xs text-gray-500">({tags.length})</span>
+              )}
+              {tab === 'processing' && (
+                <span className="ml-1 text-xs text-orange-500">⚙️</span>
               )}
             </button>
           ))}
@@ -452,6 +473,17 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
             {/* Chat Tab */}
             {activeTab === 'chat' && (
               <VideoChat video={video} transcript={transcript} />
+            )}
+
+            {/* Processing Tab */}
+            {activeTab === 'processing' && session && (
+              <VideoProcessingControls 
+                videoId={video.id} 
+                onProcessingTriggered={() => {
+                  loadVideoData();
+                  onVideoRefresh();
+                }}
+              />
             )}
           </>
         )}

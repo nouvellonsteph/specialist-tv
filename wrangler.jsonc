@@ -57,7 +57,12 @@
 			"binding": "VIDEO_EMBEDDINGS",
 			"index_name": "video-embeddings"
 		}
-	]
+	],
+	"triggers": {
+		"crons": [
+			"*/5 * * * *"
+		]
+	}
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

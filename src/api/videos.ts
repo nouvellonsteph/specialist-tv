@@ -3,6 +3,7 @@
 import { Video, UploadResponse, SearchResult, StreamUploadResponse, Chapter, Tag, Transcript, VideoWithScore } from '../types';
 import { VideoLogger, VideoLogEntry } from '../services/video-logger';
 import { EmbeddingService, SimilarVideo } from '../services/embedding-service';
+import { VideoCompletionChecker } from './video-completion-checker';
 
 // Helper function to validate and transform database results to Video objects
 function validateVideo(record: Record<string, unknown>): Video {
@@ -44,6 +45,8 @@ function validateVideo(record: Record<string, unknown>): Video {
     view_count: record.view_count ? Number(record.view_count) : undefined,
     created_at: record.created_at,
     updated_at: record.updated_at,
+    created_by: record.created_by ? String(record.created_by) : undefined,
+    updated_by: record.updated_by ? String(record.updated_by) : undefined,
   };
 }
 
@@ -53,12 +56,16 @@ interface VideoRecordWithSimilarity extends Record<string, unknown> {
 }
 
 export class VideoAPI {
+  private env: CloudflareEnv;
   private logger: VideoLogger;
   private embeddingService: EmbeddingService;
-  
-  constructor(private env: CloudflareEnv) {
+  private completionChecker: VideoCompletionChecker;
+
+  constructor(env: CloudflareEnv) {
+    this.env = env;
     this.logger = new VideoLogger(env);
     this.embeddingService = new EmbeddingService(env);
+    this.completionChecker = new VideoCompletionChecker(env);
   }
 
   // Generate unique video ID
@@ -138,6 +145,31 @@ export class VideoAPI {
       VALUES (?, ?, ?, ?, 'processing', ?, ?)
     `).bind(videoId, title, description || '', streamId, thumbnailUrl, createdBy || null).run();
 
+    // Schedule immediate sync to check processing status
+    // This will help detect when the video becomes ready faster
+    setTimeout(async () => {
+      try {
+        await this.syncVideoStatusFromStream(videoId);
+      } catch (error) {
+        console.error('Error in immediate sync after upload:', error);
+      }
+    }, 5000); // Check after 5 seconds
+
+    // Schedule additional syncs at increasing intervals
+    const syncIntervals = [15000, 30000, 60000, 120000]; // 15s, 30s, 1m, 2m
+    syncIntervals.forEach((interval, index) => {
+      setTimeout(async () => {
+        try {
+          const video = await this.getVideo(videoId);
+          if (video && video.status === 'processing') {
+            await this.syncVideoStatusFromStream(videoId);
+          }
+        } catch (error) {
+          console.error(`Error in scheduled sync ${index + 1} after upload:`, error);
+        }
+      }, interval);
+    });
+
     return {
       video_id: videoId,
       stream_id: streamId,
@@ -155,7 +187,7 @@ export class VideoAPI {
   }
 
   // Update video details
-  async updateVideo(videoId: string, updates: { title?: string; description?: string }, updatedBy?: string): Promise<{ success: boolean; message: string; video?: Video }> {
+  async updateVideo(videoId: string, updates: { title?: string; description?: string; abstract?: string }, updatedBy?: string): Promise<{ success: boolean; message: string; video?: Video }> {
     try {
       // Check if video exists
       const existingVideo = await this.getVideo(videoId);
@@ -175,6 +207,11 @@ export class VideoAPI {
       if (updates.description !== undefined) {
         updateFields.push('description = ?');
         params.push(updates.description || null);
+      }
+
+      if (updates.abstract !== undefined) {
+        updateFields.push('abstract = ?');
+        params.push(updates.abstract || null);
       }
 
       if (updateFields.length === 0) {
@@ -952,10 +989,11 @@ export class VideoAPI {
       const thumbnailUrl = streamData.result.thumbnail || `https://videodelivery.net/${video.stream_id}/thumbnails/thumbnail.jpg?time=0s&height=600`;
 
       // Map Stream status to our status
-      let newStatus: 'processing' | 'ready' | 'error';
+      let newStatus: string;
       switch (streamStatus) {
         case 'ready':
-          newStatus = 'ready';
+          // Don't mark as ready yet - need to check if full processing pipeline is complete
+          newStatus = 'processing';
           break;
         case 'error':
           newStatus = 'error';
@@ -979,7 +1017,7 @@ export class VideoAPI {
         });
       }
 
-      // Check if video is ready but hasn't started processing yet
+      // Check if video is ready in Stream and if processing pipeline is complete
       if (streamStatus === 'ready') {
         // Check if we have a transcript (indicates processing has started)
         const transcript = await this.env.DB.prepare(`
@@ -996,6 +1034,21 @@ export class VideoAPI {
             type: 'transcription',
             status: 'pending',
           });
+        } else {
+          // Check if all processing is complete
+          const isComplete = await this.completionChecker.isProcessingComplete(videoId);
+          
+          if (isComplete && video.status !== 'ready') {
+            console.log(`Video ${videoId} processing pipeline complete, marking as ready`);
+            await this.updateVideoStatus(videoId, 'ready', {
+              duration,
+              thumbnail_url: thumbnailUrl,
+            });
+          } else if (!isComplete) {
+            console.log(`Video ${videoId} stream ready but processing pipeline incomplete`);
+            const status = await this.completionChecker.getProcessingStatus(videoId);
+            console.log(`Processing status for ${videoId}:`, status);
+          }
         }
       }
     } catch (error) {
@@ -1004,16 +1057,40 @@ export class VideoAPI {
   }
 
 // ...
-  // Sync all processing videos from Stream API
+  // Sync all processing videos from Stream API with rate limiting
   async syncAllProcessingVideos(): Promise<void> {
     try {
       const processingVideos = await this.env.DB.prepare(`
         SELECT id FROM videos WHERE status = 'processing'
       `).all();
 
-      for (const video of processingVideos.results) {
-        await this.syncVideoStatusFromStream(String(video.id));
+      console.log(`Found ${processingVideos.results.length} videos in processing status`);
+
+      // Rate limit: Process videos in batches with delays to avoid overwhelming Stream API
+      const batchSize = 5; // Process 5 videos at a time
+      const delayBetweenBatches = 2000; // 2 second delay between batches
+      
+      for (let i = 0; i < processingVideos.results.length; i += batchSize) {
+        const batch = processingVideos.results.slice(i, i + batchSize);
+        
+        // Process batch in parallel
+        await Promise.all(
+          batch.map(async (video) => {
+            try {
+              await this.syncVideoStatusFromStream(String(video.id));
+            } catch (error) {
+              console.error(`Failed to sync video ${video.id}:`, error);
+            }
+          })
+        );
+        
+        // Delay between batches (except for the last batch)
+        if (i + batchSize < processingVideos.results.length) {
+          await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+        }
       }
+      
+      console.log('Completed syncing all processing videos');
     } catch (error) {
       console.error('Error syncing processing videos:', error);
     }
