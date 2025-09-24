@@ -7,7 +7,7 @@ import { VideoChat } from './VideoChat';
 import { Video, Tag, VideoWithScore } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount } from '../utils/dateUtils';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 
 interface Chapter {
   title: string;
@@ -26,7 +26,7 @@ interface VideoDetailsProps {
 }
 
 export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, onTimeSeek, tvMode = false }: VideoDetailsProps) {
-  const { token } = useAuth();
+  const { data: session } = useSession();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [relatedVideos, setRelatedVideos] = useState<VideoWithScore[]>([]);
   const [transcript, setTranscript] = useState<string>('');
@@ -117,7 +117,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
   };
 
   const handleSyncVideo = async () => {
-    if (!token) return;
+    if (status !== 'authenticated' || !session) return;
     
     try {
       setSyncing(true);
@@ -125,8 +125,8 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
       });
       
       if (response.ok) {
@@ -196,7 +196,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
           </div>
           
           {/* Sync button - show for processing videos or when authenticated */}
-          {token && (video.status === 'processing' || video.status === 'ready') && (
+          {status === 'authenticated' && (video.status === 'processing' || video.status === 'ready') && (
             <button
               onClick={handleSyncVideo}
               disabled={syncing}

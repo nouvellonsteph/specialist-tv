@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { LoginForm } from './LoginForm';
-import { UserProfile } from './UserProfile';
 
 interface HeaderProps {
   videoCount?: number;
@@ -16,10 +15,8 @@ interface HeaderProps {
 export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // Use auth context directly - component must be wrapped in AuthProvider
-  const { isAuthenticated, user, logout, login } = useAuth();
+  const { data: session, status } = useSession();
 
   const isActive = (path: string) => {
     if (path === '/' && pathname === '/') return true;
@@ -27,9 +24,12 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
     return false;
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push('/tv');
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/auth/signin' });
+  };
+
+  const handleSignIn = () => {
+    router.push('/auth/signin');
   };
 
   return (
@@ -79,12 +79,54 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
               </div>
             )}
             
-            {/* Authentication - show on all pages */}
-            {isAuthenticated && user ? (
-              <UserProfile user={user} onLogout={handleLogout} />
+            {/* User Profile Section */}
+            {status === 'authenticated' && session?.user ? (
+              <div className="flex items-center space-x-3">
+                {/* User Profile Picture and Info */}
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    {session.user.image ? (
+                      <Image
+                        src={session.user.image}
+                        alt={session.user.name || 'User'}
+                        width={32}
+                        height={32}
+                        className="rounded-full border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          {(session.user.name || session.user.email || 'U').charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-900">
+                        {session.user.name || 'User'}
+                      </span>
+                      {session.user.email && (
+                        <span className="text-xs text-gray-500">
+                          {session.user.email}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  title="Sign out"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 2H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
+              </div>
             ) : (
               <button
-                onClick={() => setShowLoginModal(true)}
+                onClick={handleSignIn}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,22 +139,6 @@ export function Header({ videoCount = 0, readyVideoCount = 0 }: HeaderProps) {
         </div>
       </div>
 
-      {/* Login Modal with blurred background */}
-      {showLoginModal && (
-        <>
-          {/* Blur the entire page content */}
-          <div className="fixed inset-0 z-40 backdrop-blur-sm pointer-events-none" />
-          
-          {/* Login Form Modal */}
-          <LoginForm
-            onLogin={(token: string) => {
-              login(token);
-              setShowLoginModal(false);
-            }}
-            onClose={() => setShowLoginModal(false)}
-          />
-        </>
-      )}
     </header>
   );
 }

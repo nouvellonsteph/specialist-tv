@@ -10,37 +10,25 @@ export async function OPTIONS() {
   return new NextResponse(null, { headers: corsHeaders });
 }
 
-// POST /api/auth/login - Authenticate user
+// POST /api/auth/login - Legacy endpoint - redirects to Auth.js
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json() as { username: string; password: string };
+    // This endpoint is deprecated in favor of Auth.js cookie-based authentication
+    // Redirect to the Auth.js sign-in page
+    const url = new URL(request.url);
+    const signInUrl = new URL('/auth/signin', url.origin);
     
-    // Simple hardcoded credentials for POC - in production, use proper user management
-    const validCredentials = {
-      username: 'admin',
-      password: 'specialist-tv-2024'
-    };
-    
-    if (username === validCredentials.username && password === validCredentials.password) {
-      // Generate a simple JWT-like token (in production, use proper JWT library)
-      const payload = {
-        username,
-        exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-      };
-      
-      const token = btoa(JSON.stringify(payload));
-      
-      return NextResponse.json({ token }, { headers: corsHeaders });
-    } else {
-      return NextResponse.json(
-        { message: 'Invalid credentials' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
-  } catch (error) {
-    console.error('Login error:', error);
     return NextResponse.json(
-      { message: 'Login failed' },
+      { 
+        message: 'Please use Auth.js authentication',
+        redirectUrl: signInUrl.toString()
+      },
+      { status: 302, headers: corsHeaders }
+    );
+  } catch (error) {
+    console.error('Login redirect error:', error);
+    return NextResponse.json(
+      { message: 'Authentication system error' },
       { status: 500, headers: corsHeaders }
     );
   }

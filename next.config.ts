@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "frame-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com https://ui-avatars.com; img-src 'self' data: https://i.ytimg.com https://*.videodelivery.net https://*.cloudflarestream.com https://ui-avatars.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.cloudflarestream.com; connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com;"
+            value: "frame-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com https://ui-avatars.com; img-src 'self' data: https://i.ytimg.com https://*.videodelivery.net https://*.cloudflarestream.com https://ui-avatars.com https://*.googleusercontent.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.cloudflarestream.com; connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com;"
           }
         ]
       }

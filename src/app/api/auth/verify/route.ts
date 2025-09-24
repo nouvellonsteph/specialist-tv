@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { getSession } from '@/lib/auth-helpers';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,44 +12,42 @@ export async function OPTIONS() {
   return new NextResponse(null, { headers: corsHeaders });
 }
 
-// POST /api/auth/verify - Verify token
+// POST /api/auth/verify - Verify Auth.js session
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const { env } = await getCloudflareContext();
+    const session = await getSession(request, env);
+    
+    if (!session?.user) {
       return NextResponse.json(
-        { message: 'No token provided' },
+        { 
+          valid: false, 
+          message: 'No valid session found' 
+        },
         { status: 401, headers: corsHeaders }
       );
     }
     
-    const token = authHeader.substring(7);
-    
-    try {
-      const payload = JSON.parse(atob(token)) as { username: string; exp: number };
-      
-      // Check if token is expired
-      if (Date.now() > payload.exp) {
-        return NextResponse.json(
-          { message: 'Token expired' },
-          { status: 401, headers: corsHeaders }
-        );
-      }
-      
-      return NextResponse.json(
-        { valid: true, username: payload.username },
-        { headers: corsHeaders }
-      );
-    } catch {
-      return NextResponse.json(
-        { message: 'Invalid token' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
-  } catch (error) {
-    console.error('Token verification error:', error);
     return NextResponse.json(
-      { message: 'Verification failed' },
+      { 
+        valid: true, 
+        user: {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name
+        },
+        provider: session.provider,
+        expires: session.expires
+      },
+      { headers: corsHeaders }
+    );
+  } catch (error) {
+    console.error('Session verification error:', error);
+    return NextResponse.json(
+      { 
+        valid: false,
+        message: 'Verification failed' 
+      },
       { status: 500, headers: corsHeaders }
     );
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { requireAuth } from '@/utils/auth';
+import { requireAuth } from '@/lib/auth-helpers';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,10 +15,17 @@ export async function OPTIONS() {
 // POST /api/videos/chat - Video chat with AI
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    requireAuth(request);
-    
     const { env } = await getCloudflareContext();
+    
+    // Require authentication
+    const session = await requireAuth(request, env);
+    
+    console.log('Video chat session:', { 
+      userId: session.user?.id, 
+      email: session.user?.email,
+      provider: session.provider 
+    });
+    
     const { message, transcript, videoTitle, videoDescription } = await request.json() as {
       message: string;
       transcript: string;

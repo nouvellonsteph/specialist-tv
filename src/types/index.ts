@@ -110,6 +110,9 @@ export interface WebhookData {
 }
 
 export interface CloudflareEnv {
+  AUTH_SECRET?: string;
+  AUTH_URL?: string;
+  NEXTJS_ENV?: string;
   DB: D1Database;
   THUMBNAILS: R2Bucket;
   VIDEO_PROCESSING_QUEUE: Queue;
@@ -124,6 +127,8 @@ export interface CloudflareEnv {
   OIDC_CLIENT_SECRET?: string;
   OIDC_ISSUER?: string;
   OIDC_REDIRECT_URI?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   YOUTUBE_API_KEY?: string;
   BROWSER?: Fetcher;
   ENVIRONMENT?: string;

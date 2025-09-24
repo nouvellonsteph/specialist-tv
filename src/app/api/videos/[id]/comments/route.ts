@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { requireAuth } from '@/utils/auth';
+import { requireAuth, getUserFromSession } from '@/lib/auth-helpers';
 import { 
   handleGetVideoComments, 
   handleCreateComment 
@@ -48,10 +48,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check authentication
-    requireAuth(request);
-    
     const { env } = await getCloudflareContext();
+    
+    // Check authentication
+    const session = await requireAuth(request, env);
+    const user = getUserFromSession(session);
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
     const { id } = await params;
     
     const response = await handleCreateComment(request, id, env);
