@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Video } from '../types';
-import { useAuth } from '../contexts/AuthContext';
-import { LoginForm } from './LoginForm';
+import { useSession } from 'next-auth/react';
 
 interface Message {
   id: string;
@@ -18,11 +17,12 @@ interface VideoChatProps {
 }
 
 export function VideoChat({ video, transcript }: VideoChatProps) {
-  const { token, isAuthenticated, login } = useAuth();
+  const { data: session, status } = useSession();
+  const isAuthenticated = !!session?.user;
+  const loading = status === 'loading';
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,8 +66,8 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           videoId: video.id,
           message: userMessage.content,
@@ -110,6 +110,15 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
   };
 
   // Show login prompt for unauthenticated users
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full max-h-96 items-center justify-center text-center p-6">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        <p className="text-sm text-gray-500 mt-4">Checking session...</p>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col h-full max-h-96 items-center justify-center text-center p-6">
@@ -126,10 +135,7 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
           Please log in to start chatting with the AI assistant.
         </p>
         <button
-          onClick={() => {
-            console.log('Login button clicked, setting showLoginModal to true');
-            setShowLoginModal(true);
-          }}
+          onClick={() => window.location.href = '/creator'}
           className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
         >
           Login to Chat
@@ -240,34 +246,6 @@ export function VideoChat({ video, transcript }: VideoChatProps) {
       )}
     </div>
 
-    {/* Login Modal */}
-    {console.log('showLoginModal state:', showLoginModal)}
-    {showLoginModal && (
-      <>
-        {/* Test Modal */}
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h3 className="text-lg font-bold mb-4">Test Modal</h3>
-            <p className="mb-4">If you see this, the modal is working!</p>
-            <button 
-              onClick={() => setShowLoginModal(false)}
-              className="px-4 py-2 bg-blue-500 text-white rounded"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-        
-        {/* Original Login Form Modal */}
-        <LoginForm
-          onLogin={(token: string) => {
-            login(token);
-            setShowLoginModal(false);
-          }}
-          onClose={() => setShowLoginModal(false)}
-        />
-      </>
-    )}
-    </>
+        </>
   );
 }

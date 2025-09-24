@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Video, Chapter, Tag } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+// Authentication handled via cookies in API endpoints
 
 interface VideoActionsProps {
   video: Video;
@@ -21,7 +21,7 @@ interface EmbeddingStats {
 }
 
 export const VideoActions: React.FC<VideoActionsProps> = ({ video, onActionsComplete }) => {
-  const { token } = useAuth();
+  // Session is handled via cookies in API endpoints
   const [loading, setLoading] = useState<{
     chapters: boolean;
     tags: boolean;
@@ -70,9 +70,7 @@ export const VideoActions: React.FC<VideoActionsProps> = ({ video, onActionsComp
     try {
       const response = await fetch(`/api/videos/${video.id}/generate-chapters`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
       });
 
       const result: ActionResult = await response.json();
@@ -101,9 +99,7 @@ export const VideoActions: React.FC<VideoActionsProps> = ({ video, onActionsComp
     try {
       const response = await fetch(`/api/videos/${video.id}/generate-tags`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
       });
 
       const result: ActionResult = await response.json();
@@ -132,9 +128,7 @@ export const VideoActions: React.FC<VideoActionsProps> = ({ video, onActionsComp
     try {
       const response = await fetch(`/api/videos/${video.id}/vectorize`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
       });
 
       const result: ActionResult = await response.json();
@@ -163,9 +157,7 @@ export const VideoActions: React.FC<VideoActionsProps> = ({ video, onActionsComp
     try {
       const response = await fetch(`/api/videos/${video.id}/generate-abstract`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
       });
 
       const result: ActionResult = await response.json();
@@ -194,9 +186,7 @@ export const VideoActions: React.FC<VideoActionsProps> = ({ video, onActionsComp
     try {
       const response = await fetch(`/api/videos/${video.id}/generate-transcript`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
       });
 
       const result: ActionResult = await response.json();

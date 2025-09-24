@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Comment, Video } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 
 // Helper function to format time ago
 function formatTimeAgo(date: string): string {
@@ -33,7 +33,7 @@ interface CommentItemProps {
 }
 
 export function VideoComments({ video }: VideoCommentsProps) {
-  const { user, isAuthenticated, token } = useAuth();
+  const { data: session, status } = useSession();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !isAuthenticated || submitting) return;
+    if (!newComment.trim() || status !== 'authenticated' || submitting || !session) return;
 
     try {
       setSubmitting(true);
@@ -74,8 +74,8 @@ export function VideoComments({ video }: VideoCommentsProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           content: newComment.trim(),
           parent_id: replyingTo,
@@ -97,7 +97,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
   };
 
   const handleEditComment = async (commentId: string, content: string) => {
-    if (!isAuthenticated || submitting) return;
+    if (status !== 'authenticated' || submitting || !session) return;
 
     try {
       setSubmitting(true);
@@ -105,8 +105,8 @@ export function VideoComments({ video }: VideoCommentsProps) {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ content }),
       });
 
@@ -125,14 +125,12 @@ export function VideoComments({ video }: VideoCommentsProps) {
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    if (!isAuthenticated || !confirm('Are you sure you want to delete this comment?')) return;
+    if (status !== 'authenticated' || !session || !confirm('Are you sure you want to delete this comment?')) return;
 
     try {
       const response = await fetch(`/api/videos/${video.id}/comments/${commentId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
       });
 
       if (response.ok) {
@@ -191,7 +189,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
 
       <div className="space-y-6">
         {/* New Comment Form */}
-        {isAuthenticated ? (
+        {status === 'authenticated' ? (
           <form onSubmit={handleSubmitComment} className="space-y-3">
             <div>
               <label htmlFor="comment" className="sr-only">
@@ -247,7 +245,7 @@ export function VideoComments({ video }: VideoCommentsProps) {
                 onReply={handleReply}
                 onEdit={handleEdit}
                 onDelete={handleDeleteComment}
-                currentUser={user?.username}
+                currentUser={session?.user?.name || undefined}
                 level={0}
               />
             ))

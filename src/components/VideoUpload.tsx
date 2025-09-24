@@ -2,14 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { Video } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 
 interface VideoUploadProps {
   onVideoUploaded: (video: Video) => void;
 }
 
 export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
-  const { token } = useAuth();
+  const { data: session, status } = useSession();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [title, setTitle] = useState('');
@@ -54,7 +54,7 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
   }, [title]);
 
   const handleUpload = async () => {
-    if (!selectedFile || !title.trim()) return;
+    if (!selectedFile || !title.trim() || status !== 'authenticated' || !session) return;
 
     // Clear previous errors and reset progress
     setError(null);
@@ -73,9 +73,7 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
 
       const response = await fetch('/api/videos/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'same-origin',
         body: formData,
       });
 
@@ -166,8 +164,8 @@ export function VideoUpload({ onVideoUploaded }: VideoUploadProps) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
             },
+            credentials: 'same-origin',
           });
           
           if (syncResponse.ok) {

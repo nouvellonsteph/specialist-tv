@@ -1,23 +1,24 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { LoginPage } from './LoginPage';
+import { ReactNode, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, login, loading } = useAuth();
-  const [loginError, setLoginError] = useState<string>('');
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  const handleLogin = (token: string) => {
-    login(token);
-    setLoginError('');
-  };
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+  }, [status, router]);
 
-  if (loading) {
+  if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -30,8 +31,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} error={loginError} />;
+  if (status === 'unauthenticated' || !session?.user) {
+    return null; // Will redirect via useEffect
   }
 
   return <>{children}</>;

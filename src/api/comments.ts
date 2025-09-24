@@ -1,4 +1,4 @@
-import { CloudflareEnv, Comment } from '../types';
+import { Comment } from '../types';
 
 export class CommentsAPI {
   constructor(private env: CloudflareEnv) {}

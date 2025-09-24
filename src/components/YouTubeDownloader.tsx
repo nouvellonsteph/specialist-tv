@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Video } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+// Authentication handled via cookies in API endpoints
 
 interface YouTubeFormat {
   itag: number;
@@ -33,7 +33,7 @@ interface YouTubeDownloaderProps {
 }
 
 export function YouTubeDownloader({ onVideoUploaded }: YouTubeDownloaderProps) {
-  const { token } = useAuth();
+  // Session is handled via cookies in API endpoints
   const [url, setUrl] = useState('');
   const [videoInfo, setVideoInfo] = useState<YouTubeVideoInfo | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<YouTubeFormat | null>(null);
@@ -65,8 +65,8 @@ export function YouTubeDownloader({ onVideoUploaded }: YouTubeDownloaderProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ url: url.trim() }),
       });
 
@@ -91,7 +91,7 @@ export function YouTubeDownloader({ onVideoUploaded }: YouTubeDownloaderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [url, token]);
+  }, [url]);
 
   const handleDownload = useCallback(async () => {
     if (!videoInfo || !selectedFormat) return;
@@ -104,8 +104,8 @@ export function YouTubeDownloader({ onVideoUploaded }: YouTubeDownloaderProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           url,
           format: selectedFormat,
@@ -139,7 +139,7 @@ export function YouTubeDownloader({ onVideoUploaded }: YouTubeDownloaderProps) {
     } finally {
       // Download completed
     }
-  }, [videoInfo, selectedFormat, customTitle, customDescription, url, token, onVideoUploaded, resetState]);
+  }, [videoInfo, selectedFormat, customTitle, customDescription, url, onVideoUploaded, resetState]);
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { VideoAPI } from '@/api/videos';
-import { requireAuth } from '@/utils/auth';
+import { requireAuth, getUserFromSession } from '@/lib/auth-helpers';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,10 +16,14 @@ export async function OPTIONS() {
 // POST /api/search/rebuild - Rebuild search index
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    requireAuth(request);
-    
     const { env } = await getCloudflareContext();
+    
+    // Check authentication
+    const session = await requireAuth(request);
+    const user = getUserFromSession(session);
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
     const videoAPI = new VideoAPI(env);
     
     await videoAPI.rebuildSearchIndexManually();

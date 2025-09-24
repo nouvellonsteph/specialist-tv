@@ -1,4 +1,3 @@
-import { CloudflareEnv } from '../types';
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error';
 

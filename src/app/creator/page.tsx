@@ -8,12 +8,12 @@ import VideoLibrary from '../../components/VideoLibrary';
 import { SearchBar } from '../../components/SearchBar';
 import { Header } from '../../components/Header';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 
 import { Video, VideoWithScore } from '../../types';
 
 function CreatorContent() {
-  const { token } = useAuth();
+  const { data: session } = useSession();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
@@ -153,7 +153,7 @@ function CreatorContent() {
 
   // Periodic sync for processing videos
   const performPeriodicSync = useCallback(async () => {
-    if (!token) return;
+    if (!session?.user) return;
     
     try {
       // Check if there are any processing videos
@@ -166,8 +166,8 @@ function CreatorContent() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
       });
       
       if (response.ok) {
@@ -178,7 +178,7 @@ function CreatorContent() {
     } catch (error) {
       console.error('Periodic sync error:', error);
     }
-  }, [token, videos, loadVideos]);
+  }, [session, videos, loadVideos]);
 
   // Load videos on mount
   useEffect(() => {
@@ -187,12 +187,12 @@ function CreatorContent() {
 
   // Set up periodic sync every 2 minutes for processing videos
   useEffect(() => {
-    if (!token) return;
+    if (!session?.user) return;
     
     const interval = setInterval(performPeriodicSync, 2 * 60 * 1000); // 2 minutes
     
     return () => clearInterval(interval);
-  }, [performPeriodicSync, token]);
+  }, [performPeriodicSync, session?.user]);
 
   // Handle URL params when data is available and not yet processed
   useEffect(() => {
@@ -212,13 +212,17 @@ function CreatorContent() {
   };
 
   const handleVideoUpdate = async (videoId: string, updates: { title?: string; description?: string }) => {
+    if (!session?.user) {
+      console.error('Authentication required to update video');
+      return;
+    }
     try {
       const response = await fetch(`/api/videos/${videoId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        credentials: 'same-origin',
         body: JSON.stringify(updates),
       });
 

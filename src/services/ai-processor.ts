@@ -1,6 +1,5 @@
 // AI processing service for transcription, tagging, and chapters
 
-import { CloudflareEnv } from '../types';
 import { VideoLogger } from './video-logger';
 import { EmbeddingService } from './embedding-service';
 

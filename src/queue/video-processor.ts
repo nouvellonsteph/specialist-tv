@@ -1,6 +1,6 @@
 // Queue consumer for async video processing
 
-import { CloudflareEnv, ProcessingJob, StreamInfoResponse, WebhookPayload } from '../types';
+import { ProcessingJob, StreamInfoResponse, WebhookPayload } from '../types';
 import { AIProcessor } from '../services/ai-processor';
 import { VideoAPI } from '../api/videos';
 
