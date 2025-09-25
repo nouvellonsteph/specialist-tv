@@ -764,88 +764,69 @@ export class VideoAPI {
     await this.rebuildSearchIndex();
   }
 
-  // Get related videos using TF-IDF similarity
+  // Cache for related videos (5 minute TTL)
+  private relatedVideosCache = new Map<string, { data: VideoWithScore[]; timestamp: number }>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Get related videos using vector similarity only
   async getRelatedVideos(videoId: string, limit = 5): Promise<VideoWithScore[]> {
     try {
-      // First, try to get related videos using vector similarity (semantic approach)
-      const similarVideos = await this.embeddingService.getRelatedVideos(videoId, limit);
-      
-      if (similarVideos.length > 0) {
-        console.log(`Found ${similarVideos.length} vector-based related videos for ${videoId}`);
-        
-        // Convert SimilarVideo[] to VideoWithScore[] by fetching actual video records
-        const videoIds = similarVideos.map(sv => sv.videoId);
-        const placeholders = videoIds.map(() => '?').join(',');
-        
-        const videoRecords = await this.env.DB.prepare(`
-          SELECT * FROM videos 
-          WHERE id IN (${placeholders}) AND status = 'ready'
-          ORDER BY CASE ${videoIds.map((id, index) => `WHEN id = ? THEN ${index}`).join(' ')}
-                   ELSE ${videoIds.length} END
-        `).bind(...videoIds, ...videoIds).all();
-        
-        // Map video records with their similarity scores
-        return videoRecords.results.map(record => {
-          const video = validateVideo(record);
-          const similarVideo = similarVideos.find(sv => sv.videoId === video.id);
-          return {
-            ...video,
-            confidence_score: similarVideo?.score // Use similarity score as confidence_score
-          };
-        });
-      }
-      
-      console.log(`No vector embeddings found for ${videoId}, falling back to tag-based recommendations`);
-      
-      // Fallback to tag-based similarity if no vector embeddings exist
-      const currentVideoTags = await this.env.DB.prepare(`
-        SELECT t.name, vt.confidence_score
-        FROM video_tags vt
-        JOIN tags t ON vt.tag_id = t.id
-        WHERE vt.video_id = ?
-      `).bind(videoId).all();
-
-      if (currentVideoTags.results.length === 0) {
-        console.log(`No tags found for video ${videoId}`);
-        return [];
+      // Check cache first
+      const cacheKey = `${videoId}-${limit}`;
+      const cached = this.relatedVideosCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        console.log(`Cache hit for related videos: ${videoId}`);
+        return cached.data;
       }
 
-      const tagNames = currentVideoTags.results.map((t: Record<string, unknown>) => (t as { name: string }).name);
+      // Use only vector similarity (no fallback)
+      const result = await this.getVectorBasedRelated(videoId, limit);
       
-      // Find videos with similar tags, weighted by recency
-      const relatedVideos = await this.env.DB.prepare(`
-        SELECT 
-          v.*,
-          COUNT(vt.tag_id) as common_tags,
-          AVG(vt.confidence_score) as avg_confidence,
-          (COUNT(vt.tag_id) * AVG(vt.confidence_score) * 
-           (1.0 - (julianday('now') - julianday(v.upload_date)) / 365.0)) as similarity_score
-        FROM videos v
-        JOIN video_tags vt ON v.id = vt.video_id
-        JOIN tags t ON vt.tag_id = t.id
-        WHERE t.name IN (${tagNames.map(() => '?').join(',')})
-          AND v.id != ?
-          AND v.status = 'ready'
-        GROUP BY v.id
-        ORDER BY similarity_score DESC
-        LIMIT ?
-      `).bind(...tagNames, videoId, limit).all();
-
-      console.log(`Found ${relatedVideos.results.length} tag-based related videos for ${videoId}`);
-      return relatedVideos.results.map(record => {
-        const video = validateVideo(record);
-        const recordWithScore = record as (typeof record & { similarity_score: number });
-        return {
-          ...video,
-          confidence_score: recordWithScore.similarity_score // Use tag-based similarity score
-        };
-      });
+      console.log(`Found ${result.length} vector-based related videos for ${videoId}`);
+      
+      // Cache the result
+      this.relatedVideosCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
       
     } catch (error) {
       console.error(`Error getting related videos for ${videoId}:`, error);
       return [];
     }
   }
+
+  // Vector-based related videos (no timeout, let it complete)
+  private async getVectorBasedRelated(videoId: string, limit: number): Promise<VideoWithScore[]> {
+    const similarVideos = await this.embeddingService.getRelatedVideos(videoId, limit);
+    
+    if (similarVideos.length === 0) {
+      console.log(`No vector embeddings found for video: ${videoId}`);
+      return [];
+    }
+    
+    // Single optimized query to get video records with scores
+    const videoIds = similarVideos.map(sv => sv.videoId);
+    const placeholders = videoIds.map(() => '?').join(',');
+    
+    const videoRecords = await this.env.DB.prepare(`
+      SELECT * FROM videos 
+      WHERE id IN (${placeholders}) AND status = 'ready'
+    `).bind(...videoIds).all();
+    
+    // Create score lookup map for O(1) access
+    const scoreMap = new Map(similarVideos.map(sv => [sv.videoId, sv.score]));
+    
+    return videoRecords.results
+      .map(record => {
+        const video = validateVideo(record);
+        return {
+          ...video,
+          confidence_score: scoreMap.get(video.id) || 0
+        };
+      })
+      .sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0))
+      .slice(0, limit);
+  }
+
 
   // Get video tags
   private async getVideoTags(videoId: string): Promise<Tag[]> {

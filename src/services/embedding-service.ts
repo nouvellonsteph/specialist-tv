@@ -98,26 +98,41 @@ export class EmbeddingService {
   }
 
   /**
-   * Search for similar videos using vector similarity
+   * Search for similar videos using vector similarity (original method)
    */
   async searchSimilarVideos(
     query: string,
     limit: number = 10,
     excludeVideoId?: string
   ): Promise<SimilarVideo[]> {
+    return this.searchSimilarVideosOptimized(query, limit, excludeVideoId);
+  }
+
+  /**
+   * Optimized search for similar videos using vector similarity
+   */
+  private async searchSimilarVideosOptimized(
+    query: string,
+    limit: number = 10,
+    excludeVideoId?: string
+  ): Promise<SimilarVideo[]> {
     try {
+      // Truncate very long queries to improve AI model performance
+      const truncatedQuery = query.length > 2000 ? query.substring(0, 2000) + '...' : query;
+      
       // Generate embedding for the search query
       const queryEmbedding = await this.env.AI.run('@cf/baai/bge-base-en-v1.5', {
-        text: query
+        text: truncatedQuery
       }) as { data: number[][] };
 
-      // Search in Vectorize
+      // Optimized Vectorize query with smaller topK for better performance
+      const topK = Math.min(limit * 2, 20); // Reduced from limit * 3 to limit * 2, max 20
       const results = await this.env.VIDEO_EMBEDDINGS.query(queryEmbedding.data[0], {
-        topK: limit * 3, // Get more results to filter duplicates
+        topK,
         returnMetadata: true
       });
 
-      // Process results and deduplicate by video ID
+      // Process results and deduplicate by video ID (optimized)
       const videoScores = new Map<string, SimilarVideo>();
       
       for (const match of results.matches) {
@@ -130,7 +145,8 @@ export class EmbeddingService {
         }
 
         // Keep the highest scoring chunk for each video
-        if (!videoScores.has(videoId) || videoScores.get(videoId)!.score < match.score) {
+        const existingScore = videoScores.get(videoId)?.score || 0;
+        if (match.score > existingScore) {
           videoScores.set(videoId, {
             videoId,
             score: match.score,
@@ -146,9 +162,9 @@ export class EmbeddingService {
         }
       }
 
-      // Return top results sorted by score, filtered by minimum threshold
+      // Return top results sorted by score, with lower threshold for better recall
       return Array.from(videoScores.values())
-        .filter(video => video.score > 0.6) // Only include videos with >60% similarity
+        .filter(video => video.score > 0.5) // Lowered from 0.6 to 0.5 for better recall
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
     } catch (error) {
@@ -157,11 +173,22 @@ export class EmbeddingService {
     }
   }
 
+  // Cache for related videos (10 minute TTL)
+  private relatedCache = new Map<string, { data: SimilarVideo[]; timestamp: number }>();
+  private readonly RELATED_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
   /**
-   * Find related videos for a specific video
+   * Find related videos for a specific video (optimized with caching)
    */
   async getRelatedVideos(videoId: string, limit: number = 5): Promise<SimilarVideo[]> {
     try {
+      // Check cache first
+      const cacheKey = `related-${videoId}-${limit}`;
+      const cached = this.relatedCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.RELATED_CACHE_TTL) {
+        return cached.data;
+      }
+
       // Get the video's transcript from database
       const video = await this.env.DB.prepare(`
         SELECT v.title, v.description, t.content as transcript
@@ -175,13 +202,15 @@ export class EmbeddingService {
         return [];
       }
 
-      // Use the transcript to find similar videos
-      const similarVideos = await this.searchSimilarVideos(
+      // Use optimized search with reduced topK for better performance
+      const similarVideos = await this.searchSimilarVideosOptimized(
         video.transcript as string,
         limit,
         videoId // Exclude the current video
       );
 
+      // Cache the result
+      this.relatedCache.set(cacheKey, { data: similarVideos, timestamp: Date.now() });
       return similarVideos;
     } catch (error) {
       console.error(`❌ Error getting related videos for ${videoId}:`, error);
