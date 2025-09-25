@@ -1689,4 +1689,128 @@ export class VideoAPI {
       console.error('Error in batch updating view counts:', error);
     }
   }
+
+  // Update video thumbnail using percentage-based timestamp
+  async updateVideoThumbnail(videoId: string, thumbnailTimestampPct: number, updatedBy?: string): Promise<{ success: boolean; message: string; thumbnailUrl?: string }> {
+    try {
+      // Validate percentage (0.0 to 1.0)
+      if (thumbnailTimestampPct < 0 || thumbnailTimestampPct > 1) {
+        return { success: false, message: 'Thumbnail timestamp percentage must be between 0 and 1' };
+      }
+
+      // Get video details
+      const video = await this.getVideo(videoId);
+      if (!video) {
+        return { success: false, message: 'Video not found' };
+      }
+
+      if (!this.env.STREAM_ACCOUNT_ID || !this.env.STREAM_API_TOKEN) {
+        return { success: false, message: 'Stream API credentials not configured' };
+      }
+
+      // Update thumbnail timestamp in Cloudflare Stream
+      const streamResponse = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${this.env.STREAM_ACCOUNT_ID}/stream/${video.stream_id}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.env.STREAM_API_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            thumbnailTimestampPct: thumbnailTimestampPct,
+          }),
+        }
+      );
+
+      if (!streamResponse.ok) {
+        let errorMessage = `Stream API error (${streamResponse.status}): ${streamResponse.statusText}`;
+        try {
+          const errorData = await streamResponse.json() as {
+            errors?: Array<{ message: string }>;
+            error?: string;
+          };
+          if (errorData.errors && errorData.errors.length > 0) {
+            errorMessage += ` - ${errorData.errors.map(e => e.message).join(', ')}`;
+          } else if (errorData.error) {
+            errorMessage += ` - ${errorData.error}`;
+          }
+        } catch (e) {
+          console.error('Could not parse Stream API error response:', e);
+        }
+        return { success: false, message: errorMessage };
+      }
+
+      // Generate new thumbnail URL with timestamp (convert percentage to seconds)
+      const videoDuration = video.duration || 60; // Default to 60 seconds if duration unknown
+      const timeInSeconds = Math.floor(videoDuration * thumbnailTimestampPct);
+      const thumbnailUrl = `https://videodelivery.net/${video.stream_id}/thumbnails/thumbnail.jpg?time=${timeInSeconds}s&height=600&fit=crop`;
+      
+      // Update thumbnail URL in database
+      await this.env.DB.prepare(`
+        UPDATE videos SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE id = ?
+      `).bind(thumbnailUrl, updatedBy || null, videoId).run();
+
+      await this.logger.log(videoId, 'info', 'update', 'Video thumbnail updated', { 
+        thumbnailTimestampPct,
+        thumbnailUrl 
+      }, undefined, updatedBy);
+
+      return {
+        success: true,
+        message: 'Thumbnail updated successfully',
+        thumbnailUrl
+      };
+
+    } catch (error) {
+      await this.logger.log(videoId, 'error', 'update', 'Failed to update video thumbnail', { error });
+      console.error(`Failed to update thumbnail for video ${videoId}:`, error);
+      return { success: false, message: 'Failed to update thumbnail' };
+    }
+  }
+
+  // Generate thumbnail preview URLs for selection
+  async generateThumbnailPreviews(videoId: string): Promise<{ success: boolean; message: string; previews?: Array<{ percentage: number; url: string; label: string }> }> {
+    try {
+      const video = await this.getVideo(videoId);
+      if (!video) {
+        return { success: false, message: 'Video not found' };
+      }
+
+      if (video.status !== 'ready') {
+        return { success: false, message: 'Video must be ready to generate thumbnail previews' };
+      }
+
+      // Get video duration to calculate time in seconds
+      const videoDuration = video.duration || 60; // Default to 60 seconds if duration unknown
+      
+      // Generate preview thumbnails at different time points
+      const previewPercentages = [
+        { percentage: 0.1, label: '10% (Beginning)' },
+        { percentage: 0.25, label: '25% (Early)' },
+        { percentage: 0.5, label: '50% (Middle)' },
+        { percentage: 0.75, label: '75% (Late)' },
+        { percentage: 0.9, label: '90% (Near End)' }
+      ];
+
+      const previews = previewPercentages.map(({ percentage, label }) => {
+        const timeInSeconds = Math.floor(videoDuration * percentage);
+        return {
+          percentage,
+          url: `https://videodelivery.net/${video.stream_id}/thumbnails/thumbnail.jpg?time=${timeInSeconds}s&height=300&width=400&fit=crop`,
+          label
+        };
+      });
+
+      return {
+        success: true,
+        message: 'Thumbnail previews generated successfully',
+        previews
+      };
+
+    } catch (error) {
+      console.error(`Failed to generate thumbnail previews for video ${videoId}:`, error);
+      return { success: false, message: 'Failed to generate thumbnail previews' };
+    }
+  }
 }
