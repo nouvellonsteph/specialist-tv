@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '../../components/Header';
 import { Video, VideoWithScore } from '../../types';
 import { SearchBar } from '../../components/SearchBar';
+import { SearchFilters, SearchFilters as SearchFiltersType } from '../../components/SearchFilters';
 import { formatTime } from '../../utils/time';
 import { formatViewCount, formatRelativeDate } from '../../utils/dateUtils';
 
@@ -16,19 +17,32 @@ function TVContent() {
   const [searchResults, setSearchResults] = useState<VideoWithScore[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableCreators, setAvailableCreators] = useState<string[]>([]);
+  const [currentQuery, setCurrentQuery] = useState('');
 
   const [initialUrlProcessed, setInitialUrlProcessed] = useState(false);
 
   // Debounced search to prevent flickering
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  // Search filters state
+  const [filters, setFilters] = useState<SearchFiltersType>({
+    tags: [],
+    creators: [],
+    dateRange: {},
+    duration: {},
+    sortBy: 'relevance',
+    sortOrder: 'desc',
+  });
+
   // Handle video selection by redirecting to slug-based URL
   const handleVideoSelect = useCallback((video: Video) => {
     router.push(`/tv/${video.id}`);
   }, [router]);
 
-  // Optimized search function to prevent flickering
-  const performSearch = useCallback(async (query: string) => {
+  // Enhanced search function with filters
+  const performSearch = useCallback(async (query: string, searchFilters?: SearchFiltersType) => {
     if (!query.trim()) {
       setSearchResults([]);
       setIsSearching(false);
@@ -37,8 +51,46 @@ function TVContent() {
 
     setIsSearching(true);
     try {
-      // Use the vector search endpoint directly with appropriate parameters
-      const response = await fetch(`/api/vectors/search?q=${encodeURIComponent(query)}&limit=20&minScore=0.6&includeMetadata=true`);
+      // Build query parameters with filters
+      const params = new URLSearchParams({
+        q: query,
+        limit: '20',
+        minScore: '0.6',
+        includeMetadata: 'true'
+      });
+
+      const activeFilters = searchFilters || filters;
+      
+      // Add filter parameters
+      if (activeFilters.tags.length > 0) {
+        params.set('tags', activeFilters.tags.join(','));
+      }
+      if (activeFilters.creators.length > 0) {
+        params.set('creators', activeFilters.creators.join(','));
+      }
+      if (activeFilters.dateRange.start) {
+        params.set('dateStart', activeFilters.dateRange.start);
+      }
+      if (activeFilters.dateRange.end) {
+        params.set('dateEnd', activeFilters.dateRange.end);
+      }
+      if (activeFilters.duration.min) {
+        params.set('durationMin', activeFilters.duration.min.toString());
+      }
+      if (activeFilters.duration.max) {
+        params.set('durationMax', activeFilters.duration.max.toString());
+      }
+      if (activeFilters.status) {
+        params.set('status', activeFilters.status);
+      }
+      if (activeFilters.sortBy) {
+        params.set('sortBy', activeFilters.sortBy);
+      }
+      if (activeFilters.sortOrder) {
+        params.set('sortOrder', activeFilters.sortOrder);
+      }
+
+      const response = await fetch(`/api/vectors/search?${params.toString()}`);
       
       if (response.ok) {
         const vectorResults = await response.json() as Array<{
@@ -92,11 +144,13 @@ function TVContent() {
           const videoDetails = await Promise.all(videoDetailsPromises);
           const validVideos = videoDetails.filter((video): video is VideoWithScore => video !== null);
           
-          // In TV mode, only show ready videos
-          const readyVideos = validVideos.filter(video => video.status === 'ready');
+          // In TV mode, only show ready videos (unless status filter is applied)
+          const readyVideos = activeFilters.status ? validVideos : validVideos.filter(video => video.status === 'ready');
           
-          // Sort by confidence score (highest first)
-          readyVideos.sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0));
+          // Sort by confidence score (highest first) if relevance sorting
+          if (activeFilters.sortBy === 'relevance') {
+            readyVideos.sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0));
+          }
           
           setSearchResults(readyVideos);
         } else {
@@ -112,7 +166,7 @@ function TVContent() {
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [filters]);
 
   // Handle URL parameters on mount
   const handleUrlParams = useCallback(async () => {
@@ -168,8 +222,23 @@ function TVContent() {
     }
   };
 
+  // Load available filter options
+  const loadFilterOptions = async () => {
+    try {
+      const response = await fetch('/api/search/filters');
+      if (response.ok) {
+        const data = await response.json() as { tags: string[]; creators: string[] };
+        setAvailableTags(data.tags || []);
+        setAvailableCreators(data.creators || []);
+      }
+    } catch (error) {
+      console.error('Failed to load filter options:', error);
+    }
+  };
+
   // Handle search with debouncing
   const handleSearch = useCallback((query: string) => {
+    setCurrentQuery(query);
     // Update URL with search query
     updateUrl({ q: query });
     
@@ -186,6 +255,26 @@ function TVContent() {
     setSearchTimeout(timeout);
   }, [performSearch, searchTimeout, updateUrl]);
 
+  // Handle filter changes
+  const handleFiltersChange = useCallback((newFilters: SearchFiltersType) => {
+    setFilters(newFilters);
+    
+    // If there's a current query, re-run search with new filters
+    if (currentQuery.trim()) {
+      // Clear existing timeout
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+      
+      // Set new timeout for debounced search with filters
+      const timeout = setTimeout(() => {
+        performSearch(currentQuery, newFilters);
+      }, 300);
+      
+      setSearchTimeout(timeout);
+    }
+  }, [currentQuery, performSearch, searchTimeout]);
+
   // Videos to display (search results or all videos)
   // In TV mode, only show ready videos
   const readyVideos = videos.filter(video => video.status === 'ready');
@@ -193,6 +282,7 @@ function TVContent() {
 
   useEffect(() => {
     loadVideos();
+    loadFilterOptions();
   }, []);
 
   useEffect(() => {
@@ -208,13 +298,26 @@ function TVContent() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* TV Library: YouTube-like video grid */}
-        <SearchBar onSearch={handleSearch} />
-        <TVVideoGrid 
-          videos={displayVideos} 
-          loading={loading}
-          onVideoSelect={handleVideoSelect}
-          isSearching={isSearching}
-        />
+        <div className="space-y-6">
+          <SearchBar onSearch={handleSearch} />
+          
+          {/* Show filters when there's a search query or filters are active */}
+          {(currentQuery || searchResults.length > 0 || filters.tags.length > 0 || filters.creators.length > 0) && (
+            <SearchFilters
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              availableTags={availableTags}
+              availableCreators={availableCreators}
+            />
+          )}
+          
+          <TVVideoGrid 
+            videos={displayVideos} 
+            loading={loading}
+            onVideoSelect={handleVideoSelect}
+            isSearching={isSearching}
+          />
+        </div>
       </div>
     </div>
   );
