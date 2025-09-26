@@ -8,8 +8,11 @@ export async function GET(request: NextRequest) {
     await requirePermission(request, PERMISSIONS.MANAGE_USERS);
     const { env } = getContext();
     const userManager = new UserManager(env);
-    const users = await userManager.getAllUsers();
-    return NextResponse.json({ users });
+    const [users, invitations] = await Promise.all([
+      userManager.getAllUsers(),
+      userManager.getAllInvitations()
+    ]);
+    return NextResponse.json({ users, invitations });
 
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -24,6 +27,7 @@ interface UserActionRequest {
   permissions?: string[];
   email?: string;
   expiresInDays?: number;
+  invitationId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -116,6 +120,16 @@ export async function POST(request: NextRequest) {
         }
         
         await userManager.deleteUser(userId, currentUser.id, clientIP, userAgent);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'cancel_invitation': {
+        const { invitationId } = body;
+        if (!invitationId) {
+          return NextResponse.json({ error: 'Missing invitationId' }, { status: 400 });
+        }
+        
+        await userManager.cancelInvitation(invitationId, currentUser.id, clientIP, userAgent);
         return NextResponse.json({ success: true });
       }
 

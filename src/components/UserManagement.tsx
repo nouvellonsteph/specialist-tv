@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
-import { User, AuthorizedDomain, AuditLogEntry, AVAILABLE_PERMISSIONS, ROLE_PERMISSIONS } from '@/services/user-manager';
+import { User, AuthorizedDomain, AuditLogEntry, UserInvitation, AVAILABLE_PERMISSIONS, ROLE_PERMISSIONS } from '@/services/user-manager';
 import { getProxiedAvatarUrl } from '@/utils/avatar';
 
 interface UserManagementProps {
@@ -16,6 +16,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [domains, setDomains] = useState<AuthorizedDomain[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [invitations, setInvitations] = useState<UserInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -61,12 +62,13 @@ export function UserManagement({ onClose }: UserManagementProps) {
       if (!auditResponse.ok) throw new Error('Failed to load audit log');
       
       const [usersData, domainsData, auditData] = await Promise.all([
-        usersResponse.json() as Promise<{ users: User[] }>,
+        usersResponse.json() as Promise<{ users: User[]; invitations: UserInvitation[] }>,
         domainsResponse.json() as Promise<{ domains: AuthorizedDomain[] }>,
         auditResponse.json() as Promise<{ auditLog: AuditLogEntry[] }>
       ]);
       
       setUsers(usersData.users);
+      setInvitations(usersData.invitations);
       setDomains(domainsData.domains);
       setAuditLog(auditData.auditLog);
     } catch (err) {
@@ -135,11 +137,32 @@ export function UserManagement({ onClose }: UserManagementProps) {
         throw new Error(errorData.error || 'Invitation failed');
       }
       
+      await loadAllData();
       setShowInviteModal(false);
       setInviteForm({ email: '', role: 'viewer', permissions: [], expiresInDays: 7 });
       alert('Invitation created successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invitation failed');
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel_invitation', invitationId }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json() as { error?: string };
+        throw new Error(errorData.error || 'Cancel failed');
+      }
+      
+      await loadAllData();
+      alert('Invitation cancelled successfully!');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Cancel failed');
     }
   };
 
@@ -234,7 +257,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex space-x-8">
           {[
-            { id: 'users', label: 'Users', count: users.length },
+            { id: 'users', label: 'Users', count: users.length + invitations.length },
             { id: 'domains', label: 'Authorized Domains', count: domains.length },
             { id: 'audit', label: 'Audit Log', count: auditLog.length },
           ].map(tab => (
@@ -268,6 +291,57 @@ export function UserManagement({ onClose }: UserManagementProps) {
           
           <div className="bg-white shadow overflow-hidden sm:rounded-md">
             <ul className="divide-y divide-gray-200">
+              {/* Pending Invitations */}
+              {invitations.map(invitation => {
+                const isExpired = invitation.expires_at && new Date(invitation.expires_at) < new Date();
+                return (
+                  <li key={`invitation-${invitation.id}`}>
+                    <div className="px-4 py-4 flex items-center justify-between bg-yellow-50 border-l-4 border-yellow-400">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">Pending Invitation</div>
+                          <div className="text-sm text-black">{invitation.email}</div>
+                          {invitation.expires_at && (
+                            <div className={`text-xs ${
+                              isExpired ? 'text-red-600' : 'text-gray-500'
+                            }`}>
+                              {isExpired ? 'Expired' : 'Expires'}: {new Date(invitation.expires_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(invitation.role)}`}>
+                          {invitation.role}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          isExpired ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {isExpired ? 'Expired' : 'Pending'}
+                        </span>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleCancelInvitation(invitation.id)}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+              
+              {/* Existing Users */}
               {users.map(user => (
                 <li key={user.id}>
                   <div className="px-4 py-4 flex items-center justify-between">

@@ -552,6 +552,55 @@ export class UserManager {
     `).bind(email).run();
   }
 
+  async getAllInvitations(): Promise<UserInvitation[]> {
+    const result = await this.env.DB.prepare(`
+      SELECT 
+        id, email, role, permissions, invited_by, expires_at, used_at, is_active, created_at
+      FROM user_invitations 
+      WHERE is_active = true
+      ORDER BY created_at DESC
+    `).all();
+
+    return result.results.map(invitation => ({
+      ...invitation,
+      permissions: JSON.parse(invitation.permissions as string || '[]'),
+    })) as UserInvitation[];
+  }
+
+  async cancelInvitation(
+    invitationId: string,
+    performedBy: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<void> {
+    const invitation = await this.env.DB.prepare(`
+      SELECT email, role, permissions FROM user_invitations WHERE id = ?
+    `).bind(invitationId).first();
+
+    if (!invitation) throw new Error('Invitation not found');
+
+    await this.env.DB.prepare(`
+      UPDATE user_invitations 
+      SET is_active = false, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(invitationId).run();
+
+    // Log the action
+    await this.logAuditAction(
+      'invitation_cancelled',
+      null,
+      performedBy,
+      { 
+        email: invitation.email,
+        role: invitation.role,
+        permissions: JSON.parse(invitation.permissions as string || '[]')
+      },
+      null,
+      ipAddress,
+      userAgent
+    );
+  }
+
   // Audit Logging
   private async logAuditAction(
     action: string,
