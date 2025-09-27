@@ -519,6 +519,25 @@ export class UserManager {
     ipAddress?: string,
     userAgent?: string
   ): Promise<string> {
+    // Check if there's already an active invitation for this email
+    const existingInvitation = await this.env.DB.prepare(`
+      SELECT id, is_active FROM user_invitations 
+      WHERE email = ? AND is_active = true
+    `).bind(email).first();
+
+    if (existingInvitation) {
+      throw new Error(`An active invitation already exists for ${email}. Please cancel the existing invitation first or wait for it to expire.`);
+    }
+
+    // Also check if user already exists
+    const existingUser = await this.env.DB.prepare(`
+      SELECT id FROM users WHERE email = ?
+    `).bind(email).first();
+
+    if (existingUser) {
+      throw new Error(`User with email ${email} already exists in the system.`);
+    }
+
     const id = nanoid();
     const expiresAt = expiresInDays 
       ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
@@ -581,7 +600,7 @@ export class UserManager {
 
     await this.env.DB.prepare(`
       UPDATE user_invitations 
-      SET is_active = false, updated_at = CURRENT_TIMESTAMP
+      SET is_active = false
       WHERE id = ?
     `).bind(invitationId).run();
 

@@ -5,6 +5,9 @@ import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { User, AuthorizedDomain, AuditLogEntry, UserInvitation, AVAILABLE_PERMISSIONS, ROLE_PERMISSIONS } from '@/services/user-manager';
 import { getProxiedAvatarUrl } from '@/utils/avatar';
+import { NotificationToast } from '@/components/NotificationToast';
+import { ConfirmationModal } from '@/components/ConfirmationModal';
+import { useNotification } from '@/hooks/useNotification';
 
 interface UserManagementProps {
   onClose?: () => void;
@@ -25,8 +28,13 @@ export function UserManagement({ onClose }: UserManagementProps) {
   const [showDomainModal, setShowDomainModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCancelInviteConfirm, setShowCancelInviteConfirm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [invitationToCancel, setInvitationToCancel] = useState<UserInvitation | null>(null);
+  
+  // Notification hook
+  const { notification, showSuccess, hideNotification } = useNotification();
   
   // Form states
   const [userForm, setUserForm] = useState({
@@ -140,18 +148,20 @@ export function UserManagement({ onClose }: UserManagementProps) {
       await loadAllData();
       setShowInviteModal(false);
       setInviteForm({ email: '', role: 'viewer', permissions: [], expiresInDays: 7 });
-      alert('Invitation created successfully!');
+      showSuccess('Invitation created successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invitation failed');
     }
   };
 
-  const handleCancelInvitation = async (invitationId: string) => {
+  const handleCancelInvitation = async () => {
+    if (!invitationToCancel) return;
+    
     try {
       const response = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel_invitation', invitationId }),
+        body: JSON.stringify({ action: 'cancel_invitation', invitationId: invitationToCancel.id }),
       });
       
       if (!response.ok) {
@@ -160,9 +170,13 @@ export function UserManagement({ onClose }: UserManagementProps) {
       }
       
       await loadAllData();
-      alert('Invitation cancelled successfully!');
+      setShowCancelInviteConfirm(false);
+      setInvitationToCancel(null);
+      showSuccess('Invitation cancelled successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Cancel failed');
+      setShowCancelInviteConfirm(false);
+      setInvitationToCancel(null);
     }
   };
 
@@ -187,7 +201,7 @@ export function UserManagement({ onClose }: UserManagementProps) {
       setShowDeleteConfirm(false);
       setUserToDelete(null);
       await loadAllData(); // Refresh the user list
-      alert('User deleted successfully!');
+      showSuccess('User deleted successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
     }
@@ -329,7 +343,10 @@ export function UserManagement({ onClose }: UserManagementProps) {
                         </span>
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleCancelInvitation(invitation.id)}
+                            onClick={() => {
+                              setInvitationToCancel(invitation);
+                              setShowCancelInviteConfirm(true);
+                            }}
                             className="text-red-600 hover:text-red-800 text-sm font-medium"
                           >
                             Cancel
@@ -1007,34 +1024,42 @@ export function UserManagement({ onClose }: UserManagementProps) {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && userToDelete && (
-        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50" style={{backgroundColor: 'rgba(255, 255, 255, 0.1)'}}>
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete User Account</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <strong>{userToDelete.name || userToDelete.email}</strong>? 
-              This action cannot be undone and will permanently remove the user account and all associated data.
-            </p>
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setUserToDelete(null);
-                }}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteUser}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-              >
-                Delete User
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        title="Delete User Account"
+        message={`Are you sure you want to delete ${userToDelete?.name || userToDelete?.email}? This action cannot be undone and will permanently remove the user account and all associated data.`}
+        confirmText="Delete User"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleDeleteUser}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setUserToDelete(null);
+        }}
+      />
+
+      {/* Cancel Invitation Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showCancelInviteConfirm}
+        title="Cancel Invitation"
+        message={`Are you sure you want to cancel the invitation for ${invitationToCancel?.email}? This will prevent them from using this invitation to join the platform.`}
+        confirmText="Cancel Invitation"
+        cancelText="Keep Invitation"
+        confirmVariant="danger"
+        onConfirm={handleCancelInvitation}
+        onCancel={() => {
+          setShowCancelInviteConfirm(false);
+          setInvitationToCancel(null);
+        }}
+      />
+
+      {/* Notification Toast */}
+      <NotificationToast
+        message={notification.message}
+        type={notification.type}
+        isVisible={notification.isVisible}
+        onClose={hideNotification}
+      />
     </div>
   );
 }

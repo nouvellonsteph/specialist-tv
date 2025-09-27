@@ -7,8 +7,9 @@ import { VideoDetails } from '../../../components/VideoDetails';
 import { Header } from '../../../components/Header';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { useSession } from 'next-auth/react';
-
 import { Video } from '../../../types';
+import { NotificationToast } from '@/components/NotificationToast';
+import { useNotification } from '@/hooks/useNotification';
 
 function CreatorVideoContent() {
   const params = useParams();
@@ -20,6 +21,7 @@ function CreatorVideoContent() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [loading] = useState(false);
   const [seekTime, setSeekTime] = useState<number | undefined>(undefined);
+  const { notification, showError, hideNotification } = useNotification();
 
   // Load video by slug on mount
   const loadVideoBySlug = useCallback(async () => {
@@ -93,13 +95,13 @@ function CreatorVideoContent() {
         router.push('/creator');
       } else {
         console.error('Failed to delete video');
-        alert('Failed to delete video. Please try again.');
+        showError('Failed to delete video. Please try again.');
       }
     } catch (error) {
       console.error('Error deleting video:', error);
-      alert('Error deleting video. Please try again.');
+      showError('Error deleting video. Please try again.');
     }
-  }, [selectedVideo, router, session]);
+  }, [selectedVideo, router, session, showError]);
 
   useEffect(() => {
     loadVideoBySlug();
@@ -175,6 +177,13 @@ function CreatorVideoContent() {
 
 
       </div>
+      {/* Notification Toast */}
+      <NotificationToast
+        message={notification.message}
+        type={notification.type}
+        isVisible={notification.isVisible}
+        onClose={hideNotification}
+      />
     </div>
   );
 }

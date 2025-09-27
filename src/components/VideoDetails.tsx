@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import VideoLogs from './VideoLogs';
+import { useSession } from 'next-auth/react';
 import VTTViewer from './VTTViewer';
+import { NotificationToast } from '@/components/NotificationToast';
+import { useNotification } from '@/hooks/useNotification';
+import VideoLogs from './VideoLogs';
 import { VideoChat } from './VideoChat';
 import VideoProcessingControls from './VideoProcessingControls';
 import ThumbnailSelector from './ThumbnailSelector';
 import { Video, Tag, VideoWithScore } from '../types';
 import { formatTime } from '../utils/time';
 import { formatViewCount } from '../utils/dateUtils';
-import { useSession } from 'next-auth/react';
 
 interface Chapter {
   title: string;
@@ -33,7 +35,8 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
   const [relatedVideos, setRelatedVideos] = useState<VideoWithScore[]>([]);
   const [transcript, setTranscript] = useState<string>('');
   const [tags, setTags] = useState<Tag[]>([]);
-  const [activeTab, setActiveTab] = useState<'chapters' | 'details' | 'transcript' | 'vtt' | 'related' | 'logs' | 'chat' | 'tags' | 'processing'>('chapters');
+  const { notification, showError, hideNotification } = useNotification();
+  const [activeTab, setActiveTab] = useState<'details' | 'chapters' | 'transcript' | 'vtt' | 'tags' | 'related' | 'logs' | 'chat' | 'processing'>('details');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -113,7 +116,7 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
       }
     } catch (error) {
       console.error('Failed to delete video:', error);
-      alert('Failed to delete video. Please try again.');
+      showError('Failed to delete video. Please try again.');
     } finally {
       setDeleting(false);
     }
@@ -141,11 +144,11 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
         }
       } else {
         console.error('Video sync failed:', response.statusText);
-        alert('Failed to sync video. Please try again.');
+        showError('Failed to sync video. Please try again.');
       }
     } catch (error) {
       console.error('Sync error:', error);
-      alert('Failed to sync video. Please try again.');
+      showError('Failed to sync video. Please try again.');
     } finally {
       setSyncing(false);
     }
@@ -524,6 +527,14 @@ export function VideoDetails({ video, onClose, onVideoDelete, onVideoRefresh, on
           onClose={() => setShowThumbnailSelector(false)}
         />
       )}
+
+      {/* Notification Toast */}
+      <NotificationToast
+        message={notification.message}
+        type={notification.type}
+        isVisible={notification.isVisible}
+        onClose={hideNotification}
+      />
     </div>
   );
 }
